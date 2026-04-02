@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mã giảm giá đặc biệt</title>
+    <style>
+        body { font-family: 'Segoe UI', Arial, sans-serif; background: #f4f7fa; margin: 0; padding: 0; }
+        .container { max-width: 600px; margin: 30px auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        .header { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); padding: 40px 30px; text-align: center; }
+        .header h1 { color: white; margin: 0; font-size: 28px; }
+        .header p { color: rgba(255,255,255,0.85); margin: 8px 0 0; font-size: 15px; }
+        .body { padding: 36px 30px; text-align: center; }
+        .greeting { font-size: 18px; font-weight: 600; color: #2d3748; margin-bottom: 16px; }
+        .coupon-box { border: 3px dashed #f5576c; border-radius: 16px; padding: 28px; margin: 24px 0; background: #fff5f7; }
+        .coupon-label { font-size: 13px; color: #718096; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+        .coupon-code { font-size: 36px; font-weight: 800; color: #f5576c; letter-spacing: 4px; font-family: monospace; }
+        .coupon-value { font-size: 15px; color: #4a5568; margin-top: 12px; }
+        .btn { display: inline-block; margin-top: 24px; background: linear-gradient(135deg, #f093fb, #f5576c); color: white; text-decoration: none; padding: 14px 36px; border-radius: 50px; font-weight: 600; font-size: 15px; }
+        .footer { background: #f8f9fa; padding: 24px 30px; text-align: center; color: #718096; font-size: 13px; }
+        .footer a { color: #f5576c; text-decoration: none; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>🎁 Quà tặng đặc biệt!</h1>
+        <p>Chúng tôi gửi tặng bạn một ưu đãi hấp dẫn</p>
+    </div>
+    <div class="body">
+        <p class="greeting">Xin chào, <span th:text="${customerName}">Khách hàng</span>!</p>
+        <p style="color:#4a5568; line-height:1.7;">Cảm ơn bạn đã là khách hàng thân thiết của ShopApp! Đây là món quà đặc biệt từ chúng tôi:</p>
+
+        <div class="coupon-box">
+            <div class="coupon-label">Mã giảm giá</div>
+            <div class="coupon-code" th:text="${couponCode}">SHOPVIP</div>
+            <div class="coupon-value">
+                Giảm <strong th:text="${discount + '%'}">10%</strong> cho đơn hàng tiếp theo của bạn
+            </div>
+        </div>
+
+        <p style="color:#718096; font-size: 13px;">* Mã giảm giá có thời hạn sử dụng. Áp dụng cho tổng đơn hàng.</p>
+
+        <a href="#" class="btn">Mua sắm ngay</a>
+    </div>
+    <div class="footer">
+        <p>ShopApp &copy; 2025 | <a href="#">Hủy đăng ký nhận thông báo</a></p>
+    </div>
+</div>
+</body>
+</html>

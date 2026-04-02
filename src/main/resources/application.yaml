@@ -1,0 +1,91 @@
+server:
+  port: 8081
+spring:
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: shopapp.notify@gmail.com   # TODO: Thay bằng email thật của bạn
+    password: your-app-password-here      # TODO: Thay bằng App Password 16 ký tự từ Google
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+  datasource:
+    url: "jdbc:mysql://localhost:3306/shop_app"
+    username: root
+    password: 123456
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  data:
+    redis:
+      host: localhost
+      port: 6379
+  cache:
+    type: redis
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+  messages:
+    basename: i18n/messages
+    encoding: UTF-8
+    default-locale: en
+jwt:
+  expiration: 7200
+  secretKey: "L7p3X6gRHFtLJYp7v9XxWD5mMcu6uZzB4ELgkW8l2aI="
+
+ai:
+  provider: ollama
+  ollama:
+    base-url: "http://localhost:11434"
+    model: "llama3.2"
+
+ghn:
+  api-url: "https://dev-online-gateway.ghn.vn/shiip/public-api/v2/"
+  token: "PLACEHOLDER_TOKEN"
+  shop-id: "PLACEHOLDER_SHOP_ID"
+
+file:
+  upload-dir: "F:/my workspace/Apple-shop/business-service/uploads"
+
+cloudinary:
+  cloud-name: "dcv3lxcux"
+  api-key: "572429348217698"
+  api-secret: "ZN7rK9OWT5lMsMqxoKs5mFNjZMQ"
+  folder: "shopapp"
+
+  vnpay:
+    tmn-code: YR1UQMDB
+    secret-key: 4U06X3RP8MGFZ4QSGA9LS2VOEHK8JGJA
+    vnp-url: https://sandbox.vnpayment.vn/paymentv2/vpcpay.html
+
+app:
+  oauth2:
+    providers:
+      google:
+        client-id: "your-google-client-id"
+        client-secret: "your-google-client-secret"
+        redirect-uri: "http://localhost:8080/api/v1/auth/oauth2/callback/google"
+        authorization-uri: "https://accounts.google.com/o/oauth2/auth"
+        token-uri: "https://oauth2.googleapis.com/token"
+        user-info-uri: "https://www.googleapis.com/oauth2/v3/userinfo"
+        scope: "email profile"
+      facebook:
+        client-id: "your-facebook-app-id"
+        client-secret: "your-facebook-app-secret"
+        redirect-uri: "http://localhost:8080/api/v1/auth/oauth2/callback/facebook"
+        authorization-uri: "https://www.facebook.com/v12.0/dialog/oauth"
+        token-uri: "https://graph.facebook.com/v12.0/oauth/access_token"
+        user-info-uri: "https://graph.facebook.com/v12.0/me"
+        scope: "email public_profile"
+
+api:
+  prefix: /api/v1

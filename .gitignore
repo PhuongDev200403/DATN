@@ -1,0 +1,31 @@
+# IntelliJ IDEA (IDE files)
+.idea/
+*.iml
+
+# Maven
+target/
+.mvn/
+mvnw
+mvnw.cmd
+
+# Temporary uploads
+uploads/
+
+# Log files
+*.log
+
+# Environment files
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Miscellaneous
+*.class
+*.jar
+*.war

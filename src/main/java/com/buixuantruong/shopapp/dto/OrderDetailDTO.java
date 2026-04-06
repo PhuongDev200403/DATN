@@ -16,7 +16,7 @@ public class OrderDetailDTO {
 
 
     @Min(value = 1, message = "product's id must be higher 0")
-    private Long productId;
+    private Long variantId;
 
     @Min(value = 1, message = "price must be higher 0")
     private Float price;

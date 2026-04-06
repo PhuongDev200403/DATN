@@ -9,7 +9,10 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Entity
-@Table(name = "flash_sales")
+@Table(name = "flash_sales",
+        indexes = {
+                @Index(name = "idx_flash_sale_time", columnList = "start_time,end_time")
+        })
 @Builder
 @Data
 @NoArgsConstructor
@@ -22,14 +25,17 @@ public class FlashSale extends BaseEntity {
 
     String name;
 
+    @Column(name = "start_time")
     LocalDateTime startTime;
 
+    @Column(name = "end_time")
     LocalDateTime endTime;
 
-    Boolean active;
+    //Boolean active;
+    @Column(name = "banner")
+    String bannerUrl;
 
-    String banner;
-
+    @Column(name = "priority")
     Integer priority;
 
     @OneToMany(mappedBy = "flashSale", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)

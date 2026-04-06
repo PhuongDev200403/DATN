@@ -1,18 +1,13 @@
 package com.buixuantruong.shopapp.exception;
 
-public class AppException extends RuntimeException{
-    public AppException(StatusCode errorCode) {
-        super(errorCode.getMessage());
-        this.errorCode = errorCode;
-    }
+import lombok.Getter;
 
-    private StatusCode errorCode;
+@Getter
+public class AppException extends RuntimeException {
+    private final StatusCode statusCode;
 
-    public StatusCode getErrorCode() {
-        return errorCode;
-    }
-
-    public void setErrorCode(StatusCode errorCode) {
-        this.errorCode = errorCode;
+    public AppException(StatusCode statusCode) {
+        super(statusCode.getMessage());
+        this.statusCode = statusCode;
     }
 }

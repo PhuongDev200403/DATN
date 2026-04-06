@@ -2,6 +2,7 @@ package com.buixuantruong.shopapp.service;
 
 import com.buixuantruong.shopapp.dto.response.AnalyticsOverviewResponse;
 import com.buixuantruong.shopapp.model.Product;
+import com.buixuantruong.shopapp.model.Variant;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
@@ -111,7 +112,7 @@ public class OllamaService implements AiTextService {
                 "- ID: %d | Ten: %s | Gia: %,.0f VND | Mo ta: %s%n",
                 product.getId(),
                 product.getName(),
-                product.getPrice(),
+                resolveProductPrice(product),
                 product.getDescription() != null ? product.getDescription() : "Khong co mo ta"
         )));
 
@@ -174,5 +175,17 @@ public class OllamaService implements AiTextService {
 
     private double defaultDouble(Double value) {
         return value != null ? value : 0.0;
+    }
+
+    private float resolveProductPrice(Product product) {
+        if (product.getVariants() == null || product.getVariants().isEmpty()) {
+            return 0F;
+        }
+        return product.getVariants().stream()
+                .filter(variant -> !Boolean.FALSE.equals(variant.getIsActive()))
+                .map(Variant::getPrice)
+                .filter(price -> price != null)
+                .min(Float::compareTo)
+                .orElse(0F);
     }
 }

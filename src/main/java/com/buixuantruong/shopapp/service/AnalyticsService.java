@@ -1,5 +1,6 @@
 package com.buixuantruong.shopapp.service;
 
+import com.buixuantruong.shopapp.dto.response.AnalyticsAiInsightsResponse;
 import com.buixuantruong.shopapp.dto.response.AnalyticsOverviewResponse;
 import com.buixuantruong.shopapp.repository.AnalyticsReviewRepository;
 import com.buixuantruong.shopapp.repository.OrderRepository;
@@ -74,14 +75,13 @@ public class AnalyticsService {
     /**
      * Tổng hợp thống kê + phân tích AI bằng Gemini
      */
-    public Map<String, Object> getAiInsights() {
+    public AnalyticsAiInsightsResponse getAiInsights() {
         AnalyticsOverviewResponse overview = getOverview();
         String aiAnalysis = aiTextService.analyzeShopData(overview);
-
-        Map<String, Object> result = new HashMap<>();
-        result.put("overview", overview);
-        result.put("ai_insights", aiAnalysis);
-        result.put("generated_at", java.time.LocalDateTime.now().toString());
-        return result;
+        return AnalyticsAiInsightsResponse.builder()
+                .overview(overview)
+                .aiInsights(aiAnalysis)
+                .generatedAt(java.time.LocalDateTime.now().toString())
+                .build();
     }
 }

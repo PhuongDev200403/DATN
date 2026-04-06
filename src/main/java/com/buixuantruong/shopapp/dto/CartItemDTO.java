@@ -10,6 +10,6 @@ import lombok.experimental.FieldDefaults;
 @NoArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class CartItemDTO {
-    Long productId;
+    Long variantId;
     Integer quantity;
 }

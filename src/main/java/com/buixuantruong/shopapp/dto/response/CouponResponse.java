@@ -1,7 +1,10 @@
 package com.buixuantruong.shopapp.dto.response;
 
+import com.buixuantruong.shopapp.model.CouponType;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
+
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Data
@@ -12,11 +15,18 @@ import java.time.LocalDateTime;
 public class CouponResponse {
     Long id;
     String code;
-    String type;
-    Double value;
-    Double minimumAmount;
+    CouponType type;
+
+    BigDecimal value;
+    BigDecimal minimumAmount;
+    BigDecimal maxDiscount;
+    Integer usageLimit;
+    Integer usedCount;
+
     LocalDateTime startAt;
     LocalDateTime endAt;
+
     boolean active;
-    Double discountAmount; // Chỉ dùng khi API "apply" để trả về số tiền được giảm
+
+    BigDecimal discountAmount; // dùng khi apply
 }

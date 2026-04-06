@@ -1,10 +1,11 @@
 package com.buixuantruong.shopapp.controller;
 
+import com.buixuantruong.shopapp.dto.response.ApiResponse;
+import com.buixuantruong.shopapp.exception.StatusCode;
 import com.buixuantruong.shopapp.model.SocialLoginRequest;
 import com.buixuantruong.shopapp.model.SocialLoginResponse;
 import com.buixuantruong.shopapp.service.SocialLoginService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -15,32 +16,20 @@ public class SocialAuthController {
     private final SocialLoginService socialLoginService;
 
     @PostMapping("/google")
-    public ResponseEntity<SocialLoginResponse> loginWithGoogle(@RequestBody SocialLoginRequest request) {
-        try {
-            SocialLoginResponse response = socialLoginService.loginWithGoogle(request);
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(
-                    SocialLoginResponse.builder()
-                            .success(false)
-                            .message("Google authentication failed: " + e.getMessage())
-                            .build()
-            );
-        }
+    public ApiResponse<SocialLoginResponse> loginWithGoogle(@RequestBody SocialLoginRequest request) throws Exception {
+        return ApiResponse.<SocialLoginResponse>builder()
+                .code(StatusCode.SUCCESS.getCode())
+                .message(StatusCode.SUCCESS.getMessage())
+                .result(socialLoginService.loginWithGoogle(request))
+                .build();
     }
 
     @PostMapping("/facebook")
-    public ResponseEntity<SocialLoginResponse> loginWithFacebook(@RequestBody SocialLoginRequest request) {
-        try {
-            SocialLoginResponse response = socialLoginService.loginWithFacebook(request);
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(
-                    SocialLoginResponse.builder()
-                            .success(false)
-                            .message("Facebook authentication failed: " + e.getMessage())
-                            .build()
-            );
-        }
+    public ApiResponse<SocialLoginResponse> loginWithFacebook(@RequestBody SocialLoginRequest request) throws Exception {
+        return ApiResponse.<SocialLoginResponse>builder()
+                .code(StatusCode.SUCCESS.getCode())
+                .message(StatusCode.SUCCESS.getMessage())
+                .result(socialLoginService.loginWithFacebook(request))
+                .build();
     }
-} 
+}

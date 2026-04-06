@@ -1,5 +1,6 @@
 package com.buixuantruong.shopapp.controller;
 
+import com.buixuantruong.shopapp.dto.response.AnalyticsAiInsightsResponse;
 import com.buixuantruong.shopapp.dto.response.AnalyticsOverviewResponse;
 import com.buixuantruong.shopapp.dto.response.ApiResponse;
 import com.buixuantruong.shopapp.exception.StatusCode;
@@ -20,29 +21,21 @@ public class AnalyticsController {
 
     AnalyticsService analyticsService;
 
-    /**
-     * API 1: Thống kê dữ liệu thuần (không AI)
-     * GET /api/v1/admin/analytics/overview
-     */
     @GetMapping("/overview")
     @PreAuthorize("hasRole('ADMIN')")
-    public ApiResponse<Object> getOverview() {
+    public ApiResponse<AnalyticsOverviewResponse> getOverview() {
         AnalyticsOverviewResponse overview = analyticsService.getOverview();
-        return ApiResponse.builder()
+        return ApiResponse.<AnalyticsOverviewResponse>builder()
                 .code(StatusCode.SUCCESS.getCode())
                 .message(StatusCode.SUCCESS.getMessage())
                 .result(overview)
                 .build();
     }
 
-    /**
-     * API 2: Thống kê + Phân tích AI thông minh bằng Gemini
-     * GET /api/v1/admin/analytics/ai-insights
-     */
     @GetMapping("/ai-insights")
     @PreAuthorize("hasRole('ADMIN')")
-    public ApiResponse<Object> getAiInsights() {
-        return ApiResponse.builder()
+    public ApiResponse<AnalyticsAiInsightsResponse> getAiInsights() {
+        return ApiResponse.<AnalyticsAiInsightsResponse>builder()
                 .code(StatusCode.SUCCESS.getCode())
                 .message(StatusCode.SUCCESS.getMessage())
                 .result(analyticsService.getAiInsights())

@@ -2,7 +2,8 @@ package com.buixuantruong.shopapp.service.impl;
 
 import com.buixuantruong.shopapp.Configuration.VNPayConfig;
 import com.buixuantruong.shopapp.dto.PaymentDTO;
-import com.buixuantruong.shopapp.exception.ResourceNotFoundException;
+import com.buixuantruong.shopapp.exception.AppException;
+import com.buixuantruong.shopapp.exception.StatusCode;
 import com.buixuantruong.shopapp.model.Order;
 import com.buixuantruong.shopapp.model.Payment;
 import com.buixuantruong.shopapp.repository.OrderRepository;
@@ -29,7 +30,7 @@ public class PaymentServiceImpl implements PaymentService {
     @Override
     public String createPayment(PaymentDTO paymentDTO, HttpServletRequest request) throws UnsupportedEncodingException {
         Order order = orderRepository.findById(paymentDTO.getOrderId())
-                .orElseThrow(() -> new ResourceNotFoundException("Order not found with id: " + paymentDTO.getOrderId()));
+                .orElseThrow(() -> new AppException(StatusCode.ORDER_NOT_FOUND));
 
         String vnp_Version = VNPayConfig.vnp_Version;
         String vnp_Command = VNPayConfig.vnp_Command;
@@ -154,7 +155,7 @@ public class PaymentServiceImpl implements PaymentService {
         // Nếu vẫn không tìm thấy, throw exception
         if (paymentOptional.isEmpty()) {
             System.out.println("Payment not found with transaction ID: " + vnp_TxnRef + " or from order info: " + vnp_OrderInfo);
-            throw new ResourceNotFoundException("Payment not found with transaction ID: " + vnp_TxnRef);
+            throw new AppException(StatusCode.PAYMENT_NOT_FOUND);
         }
         
         Payment payment = paymentOptional.get();
@@ -179,7 +180,7 @@ public class PaymentServiceImpl implements PaymentService {
     @Override
     public Payment getPaymentByOrderId(Long orderId) {
         return paymentRepository.findByOrderId(orderId)
-                .orElseThrow(() -> new ResourceNotFoundException("Payment not found for order ID: " + orderId));
+                .orElseThrow(() -> new AppException(StatusCode.PAYMENT_NOT_FOUND));
     }
 
     @Override

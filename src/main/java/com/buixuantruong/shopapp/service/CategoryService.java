@@ -1,16 +1,19 @@
 package com.buixuantruong.shopapp.service;
 
-import com.buixuantruong.shopapp.dto.response.ApiResponse;
 import com.buixuantruong.shopapp.dto.CategoryDTO;
+import com.buixuantruong.shopapp.dto.response.CategoryResponse;
+import com.buixuantruong.shopapp.dto.response.MessageResponse;
+
+import java.util.List;
 
 public interface CategoryService {
-    ApiResponse<Object> createCategory(CategoryDTO categoryDTO);
+    CategoryResponse createCategory(CategoryDTO categoryDTO);
 
-    ApiResponse<Object> getCategoryById(Long id);
+    CategoryResponse getCategoryById(Long id);
 
-    ApiResponse<Object> getAllCategories();
+    List<CategoryResponse> getAllCategories();
 
-    ApiResponse<Object> updateCategory(CategoryDTO categoryDTO, Long categoryId);
+    CategoryResponse updateCategory(CategoryDTO categoryDTO, Long categoryId);
 
-    ApiResponse<Object> deleteCategory(Long id);
+    MessageResponse deleteCategory(Long id);
 }

@@ -1,32 +1,28 @@
 package com.buixuantruong.shopapp.service;
 
 import com.buixuantruong.shopapp.dto.ReviewDTO;
-import com.buixuantruong.shopapp.dto.response.ApiResponse;
-import com.buixuantruong.shopapp.exception.DataNotFoundException;
+import com.buixuantruong.shopapp.dto.response.MessageResponse;
+import com.buixuantruong.shopapp.dto.response.ReviewPageResponse;
+import com.buixuantruong.shopapp.dto.response.ReviewRatingSummaryResponse;
+import com.buixuantruong.shopapp.dto.response.ReviewResponse;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
+
 @Service
 public interface ReviewService {
+    ReviewResponse createReview(ReviewDTO reviewDTO);
 
-    // Tạo review mới
-    ApiResponse<Object> createReview(ReviewDTO reviewDTO) throws DataNotFoundException;
+    ReviewPageResponse getReviewsByProduct(Long productId, Pageable pageable);
 
-    // Lấy danh sách review của một sản phẩm (có phân trang)
-    ApiResponse<Object> getReviewsByProduct(Long productId, Pageable pageable);
+    List<ReviewResponse> getReviewsByUser(Long userId);
 
-    // Lấy danh sách review của một user
-    ApiResponse<Object> getReviewsByUser(Long userId);
+    ReviewResponse updateReview(Long reviewId, ReviewDTO reviewDTO);
 
-    // Cập nhật review (chỉ user đã tạo mới được sửa)
-    ApiResponse<Object> updateReview(Long reviewId, ReviewDTO reviewDTO) throws DataNotFoundException;
+    MessageResponse deleteReview(Long reviewId);
 
-    // Xóa review
-    ApiResponse<Object> deleteReview(Long reviewId) throws DataNotFoundException;
+    ReviewResponse respondToReview(Long reviewId, String response);
 
-    // Admin phản hồi review
-    ApiResponse<Object> respondToReview(Long reviewId, String response) throws DataNotFoundException;
-
-    // Lấy thông tin tổng hợp điểm đánh giá của sản phẩm
-    ApiResponse<Object> getProductRatingSummary(Long productId);
+    ReviewRatingSummaryResponse getProductRatingSummary(Long productId);
 }

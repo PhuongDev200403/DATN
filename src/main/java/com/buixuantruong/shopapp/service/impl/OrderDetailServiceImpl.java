@@ -1,14 +1,15 @@
 package com.buixuantruong.shopapp.service.impl;
 
-import com.buixuantruong.shopapp.dto.response.ApiResponse;
 import com.buixuantruong.shopapp.dto.OrderDetailDTO;
+import com.buixuantruong.shopapp.dto.response.MessageResponse;
+import com.buixuantruong.shopapp.exception.AppException;
 import com.buixuantruong.shopapp.exception.StatusCode;
 import com.buixuantruong.shopapp.model.Order;
 import com.buixuantruong.shopapp.model.OrderDetail;
-import com.buixuantruong.shopapp.model.Product;
+import com.buixuantruong.shopapp.model.Variant;
 import com.buixuantruong.shopapp.repository.OrderDetailRepository;
 import com.buixuantruong.shopapp.repository.OrderRepository;
-import com.buixuantruong.shopapp.repository.ProductRepository;
+import com.buixuantruong.shopapp.repository.VariantRepository;
 import com.buixuantruong.shopapp.service.OrderDetailService;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -23,17 +24,17 @@ import java.util.List;
 public class OrderDetailServiceImpl implements OrderDetailService {
     OrderDetailRepository orderDetailRepository;
     OrderRepository orderRepository;
-    ProductRepository productRepository;
+    VariantRepository variantRepository;
 
     @Override
     public OrderDetail createOrderDetail(OrderDetailDTO orderDetailDTO) {
         Order order = orderRepository.findById(orderDetailDTO.getOrderId())
-                .orElseThrow(() -> new RuntimeException("Order not found"));
-        Product product = productRepository.findById(orderDetailDTO.getProductId())
-                .orElseThrow(() -> new RuntimeException("Product not found"));
+                .orElseThrow(() -> new AppException(StatusCode.ORDER_NOT_FOUND));
+        Variant variant = variantRepository.findById(orderDetailDTO.getVariantId())
+                .orElseThrow(() -> new AppException(StatusCode.VARIANT_NOT_FOUND));
         OrderDetail orderDetail = OrderDetail.builder()
                 .order(order)
-                .product(product)
+                .variant(variant)
                 .numberOfProducts(orderDetailDTO.getNumberOfProducts())
                 .price(orderDetailDTO.getPrice())
                 .totalMoney(orderDetailDTO.getTotalMoney())
@@ -46,19 +47,19 @@ public class OrderDetailServiceImpl implements OrderDetailService {
     @Override
     public OrderDetail getOrderDetailById(Long id) {
         return orderDetailRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Order detail not found"));
+                .orElseThrow(() -> new AppException(StatusCode.ORDER_DETAIL_NOT_FOUND));
     }
 
     @Override
     public OrderDetail updateOrderDetail(Long id, OrderDetailDTO orderDetailDTO) {
         OrderDetail existingOrderDetail = orderDetailRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Order detail not found"));
+                .orElseThrow(() -> new AppException(StatusCode.ORDER_DETAIL_NOT_FOUND));
         Order existingOrder = orderRepository.findById(orderDetailDTO.getOrderId())
-                .orElseThrow(() -> new RuntimeException("Order not found"));
-        Product existingProduct = productRepository.findById(orderDetailDTO.getProductId())
-                .orElseThrow(() -> new RuntimeException("Product not found"));
+                .orElseThrow(() -> new AppException(StatusCode.ORDER_NOT_FOUND));
+        Variant existingVariant = variantRepository.findById(orderDetailDTO.getVariantId())
+                .orElseThrow(() -> new AppException(StatusCode.VARIANT_NOT_FOUND));
         existingOrderDetail.setOrder(existingOrder);
-        existingOrderDetail.setProduct(existingProduct);
+        existingOrderDetail.setVariant(existingVariant);
         existingOrderDetail.setNumberOfProducts(orderDetailDTO.getNumberOfProducts());
         existingOrderDetail.setPrice(orderDetailDTO.getPrice());
         existingOrderDetail.setTotalMoney(orderDetailDTO.getTotalMoney());
@@ -67,13 +68,9 @@ public class OrderDetailServiceImpl implements OrderDetailService {
     }
 
     @Override
-    public ApiResponse<Object> deleteOrderDetail(Long id) {
+    public MessageResponse deleteOrderDetail(Long id) {
         orderDetailRepository.deleteById(id);
-        return ApiResponse.builder()
-                .code(StatusCode.SUCCESS.getCode())
-                .message(StatusCode.SUCCESS.getMessage())
-                .result("Order detail deleted successfully")
-                .build();
+        return MessageResponse.builder().message("Order detail deleted successfully").build();
     }
 
     @Override

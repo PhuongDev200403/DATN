@@ -1,9 +1,12 @@
 package com.buixuantruong.shopapp.dto;
 
+import com.buixuantruong.shopapp.model.CouponType;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
+
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Data
@@ -16,13 +19,17 @@ public class CouponDTO {
     @NotBlank(message = "Coupon code is required")
     String code;
 
-    @NotBlank(message = "Coupon type is required (percentage or fixed)")
-    String type;
+    @NotNull(message = "Coupon type is required")
+    CouponType type;
 
     @NotNull(message = "Coupon value is required")
-    Double value;
+    BigDecimal value;
 
-    Double minimumAmount;
+    BigDecimal minimumAmount;
+
+    BigDecimal maxDiscount;
+
+    Integer usageLimit;
 
     LocalDateTime startAt;
 

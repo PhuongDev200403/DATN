@@ -1,14 +1,18 @@
 package com.buixuantruong.shopapp.controller;
 
-import com.buixuantruong.shopapp.dto.response.ApiResponse;
 import com.buixuantruong.shopapp.dto.CategoryDTO;
+import com.buixuantruong.shopapp.dto.response.ApiResponse;
+import com.buixuantruong.shopapp.dto.response.CategoryResponse;
+import com.buixuantruong.shopapp.dto.response.MessageResponse;
+import com.buixuantruong.shopapp.exception.AppException;
+import com.buixuantruong.shopapp.exception.StatusCode;
 import com.buixuantruong.shopapp.service.CategoryService;
 import jakarta.validation.Valid;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
-import org.springframework.context.support.DefaultMessageSourceResolvable;
 import org.springframework.validation.BindingResult;
+import org.springframework.validation.FieldError;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -22,36 +26,42 @@ public class CategoryController {
     CategoryService categoryService;
 
     @PostMapping("")
-    public ApiResponse<Object> createCategory(@Valid @RequestBody CategoryDTO categoryDTO,
-                                      BindingResult bindingResult) {
-        if(bindingResult.hasErrors()) {
-            List<String> errorMessage = bindingResult.getFieldErrors()
-                    .stream()
-                    .map(DefaultMessageSourceResolvable::getDefaultMessage)
-                    .toList();
-            return ApiResponse.builder()
-                    .message(String.join(", ", errorMessage))
-                    .build();
+    public ApiResponse<CategoryResponse> createCategory(@Valid @RequestBody CategoryDTO categoryDTO, BindingResult bindingResult) {
+        if (bindingResult.hasErrors()) {
+            List<String> errorMessage = bindingResult.getFieldErrors().stream().map(FieldError::getDefaultMessage).toList();
+            throw new AppException(StatusCode.VALIDATION_ERROR);
         }
-        return categoryService.createCategory(categoryDTO);
-
+        return ApiResponse.<CategoryResponse>builder()
+                .code(StatusCode.SUCCESS.getCode())
+                .message(StatusCode.SUCCESS.getMessage())
+                .result(categoryService.createCategory(categoryDTO))
+                .build();
     }
 
     @GetMapping("")
-    public ApiResponse<Object> getAllCategories(@RequestParam("page") int page, @RequestParam("limit") int limit) {
-        return categoryService.getAllCategories();
+    public ApiResponse<List<CategoryResponse>> getAllCategories(@RequestParam("page") int page, @RequestParam("limit") int limit) {
+        return ApiResponse.<List<CategoryResponse>>builder()
+                .code(StatusCode.SUCCESS.getCode())
+                .message(StatusCode.SUCCESS.getMessage())
+                .result(categoryService.getAllCategories())
+                .build();
     }
 
     @PutMapping("/{id}")
-    public ApiResponse<Object> updateCategory(@PathVariable Long id,
-                                                 @RequestBody @Valid CategoryDTO categoryDTO){
-
-        return categoryService.updateCategory(categoryDTO, id);
+    public ApiResponse<CategoryResponse> updateCategory(@PathVariable Long id, @RequestBody @Valid CategoryDTO categoryDTO) {
+        return ApiResponse.<CategoryResponse>builder()
+                .code(StatusCode.SUCCESS.getCode())
+                .message(StatusCode.SUCCESS.getMessage())
+                .result(categoryService.updateCategory(categoryDTO, id))
+                .build();
     }
 
     @DeleteMapping("/categories/{id}")
-    public ApiResponse<Object> deleteCategory(@PathVariable Long id){
-        categoryService.deleteCategory(id);
-        return categoryService.deleteCategory(id);
+    public ApiResponse<MessageResponse> deleteCategory(@PathVariable Long id) {
+        return ApiResponse.<MessageResponse>builder()
+                .code(StatusCode.SUCCESS.getCode())
+                .message(StatusCode.SUCCESS.getMessage())
+                .result(categoryService.deleteCategory(id))
+                .build();
     }
 }

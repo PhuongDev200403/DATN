@@ -1,10 +1,11 @@
 package com.buixuantruong.shopapp.controller;
 
-import com.buixuantruong.shopapp.dto.response.*;
 import com.buixuantruong.shopapp.dto.OrderDTO;
-import com.buixuantruong.shopapp.exception.DataNotFoundException;
+import com.buixuantruong.shopapp.dto.response.ApiResponse;
+import com.buixuantruong.shopapp.dto.response.MessageResponse;
+import com.buixuantruong.shopapp.dto.response.OrderListResponse;
+import com.buixuantruong.shopapp.dto.response.OrderResponse;
 import com.buixuantruong.shopapp.exception.StatusCode;
-import com.buixuantruong.shopapp.model.Order;
 import com.buixuantruong.shopapp.service.OrderService;
 import jakarta.validation.Valid;
 import lombok.AccessLevel;
@@ -15,11 +16,6 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.validation.BindingResult;
-import org.springframework.validation.FieldError;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -33,119 +29,102 @@ public class OrderController {
     OrderService orderService;
 
     @PostMapping("")
-    public ResponseEntity<ApiResponse<Object>> createOrder(@Valid @RequestBody OrderDTO orderDTO) {
-        try {
-            System.out.println("OrderController - Creating order with data: " + orderDTO);
-            ApiResponse<Object> orderResponse = orderService.createOrder(orderDTO);
-            System.out.println("OrderController - Order created successfully. Response: " + orderResponse);
-            return ResponseEntity.ok(orderResponse);
-        } catch (DataNotFoundException e) {
-            return ResponseEntity.badRequest().body(
-                    ApiResponse.builder()
-                            .code(404)
-                            .message(e.getMessage())
-                            .build()
-            );
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(
-                    ApiResponse.builder()
-                            .code(400)
-                            .message(e.getMessage())
-                            .build()
-            );
-        }
+    public ResponseEntity<ApiResponse<OrderResponse>> createOrder(@Valid @RequestBody OrderDTO orderDTO) {
+        return ResponseEntity.ok(ApiResponse.<OrderResponse>builder()
+                .code(StatusCode.SUCCESS.getCode())
+                .message(StatusCode.SUCCESS.getMessage())
+                .result(orderService.createOrder(orderDTO))
+                .build());
+    }
+
+    @PostMapping("/checkout")
+    public ResponseEntity<ApiResponse<OrderResponse>> checkout(@Valid @RequestBody OrderDTO orderDTO) {
+        return ResponseEntity.ok(ApiResponse.<OrderResponse>builder()
+                .code(StatusCode.SUCCESS.getCode())
+                .message(StatusCode.SUCCESS.getMessage())
+                .result(orderService.createOrder(orderDTO))
+                .build());
     }
 
     @GetMapping("/user/{user_id}")
-    public ApiResponse<Object> getOrdersByUserId(@PathVariable("user_id") Long userId) {
-        return orderService.getOrderByUserId(userId);
+    public ApiResponse<List<OrderResponse>> getOrdersByUserId(@PathVariable("user_id") Long userId) {
+        return ApiResponse.<List<OrderResponse>>builder()
+                .code(StatusCode.SUCCESS.getCode())
+                .message(StatusCode.SUCCESS.getMessage())
+                .result(orderService.getOrderByUserId(userId))
+                .build();
     }
 
     @GetMapping("/{id}")
-    public ApiResponse<Object> getOrderById(@PathVariable("id") Long orderId) throws DataNotFoundException {
-        return ApiResponse.builder()
+    public ApiResponse<OrderResponse> getOrderById(@PathVariable("id") Long orderId) {
+        return ApiResponse.<OrderResponse>builder()
                 .code(StatusCode.SUCCESS.getCode())
                 .message(StatusCode.SUCCESS.getMessage())
-                .result(OrderResponse.fromOrder(orderService.getOrderById(orderId)))
+                .result(orderService.getOrderById(orderId))
                 .build();
     }
 
     @PutMapping("/{id}")
-    public ApiResponse<Object> updateOrder(@PathVariable("id") @Valid Long id, @RequestBody @Valid OrderDTO order) throws DataNotFoundException {
-        return orderService.updateOrder(id, order);
+    public ApiResponse<OrderResponse> updateOrder(@PathVariable("id") @Valid Long id, @RequestBody @Valid OrderDTO order) {
+        return ApiResponse.<OrderResponse>builder()
+                .code(StatusCode.SUCCESS.getCode())
+                .message(StatusCode.SUCCESS.getMessage())
+                .result(orderService.updateOrder(id, order))
+                .build();
     }
 
     @DeleteMapping("/{id}")
-    public ApiResponse<Object> deleteOrder(@PathVariable("id") Long id) {
-        return orderService.deleteOrder(id);
+    public ApiResponse<MessageResponse> deleteOrder(@PathVariable("id") Long id) {
+        return ApiResponse.<MessageResponse>builder()
+                .code(StatusCode.SUCCESS.getCode())
+                .message(StatusCode.SUCCESS.getMessage())
+                .result(orderService.deleteOrder(id))
+                .build();
     }
 
     @GetMapping("/get-user-orders")
     @PreAuthorize("hasRole('ADMIN')")
-    public ApiResponse<Object> getProduct(@RequestParam("page") int page, @RequestParam("limit") int limit) {
-        try {
-            System.out.println("OrderController: get-user-orders called with page=" + page + ", limit=" + limit);
-            PageRequest pageRequest = PageRequest.of(page, limit, Sort.by("id").ascending());
-            Page<OrderResponse> orders = orderService.getAllUserOrders(pageRequest);
-            System.out.println("OrderController: Retrieved " + orders.getContent().size() + " orders from service");
-            int totalPages = orders.getTotalPages();
-            List<OrderResponse> orderList = orders.getContent();
-            OrderListResponse orderListResponse = OrderListResponse.builder()
-                    .orders(orderList)
-                    .totalPages(totalPages)
-                    .build();
-            System.out.println("OrderController: Returning " + orderList.size() + " orders to client");
-            return ApiResponse.builder()
-                    .result(orderListResponse)
-                    .build();
-        } catch (Exception e) {
-            System.err.println("OrderController: Error fetching orders: " + e.getMessage());
-            e.printStackTrace();
-            return ApiResponse.builder()
-                    .message("Error fetching orders: " + e.getMessage())
-                    .build();
-        }
+    public ApiResponse<OrderListResponse> getProduct(@RequestParam("page") int page, @RequestParam("limit") int limit) {
+        PageRequest pageRequest = PageRequest.of(page, limit, Sort.by("id").ascending());
+        Page<OrderResponse> orders = orderService.getAllUserOrders(pageRequest);
+        return ApiResponse.<OrderListResponse>builder()
+                .code(StatusCode.SUCCESS.getCode())
+                .message(StatusCode.SUCCESS.getMessage())
+                .result(OrderListResponse.builder()
+                        .orders(orders.getContent())
+                        .totalPages(orders.getTotalPages())
+                        .build())
+                .build();
     }
 
     @GetMapping("/get-orders-by-keyword")
     @PreAuthorize("hasRole('ADMIN')")
-    public ApiResponse<Object> getOrdersByKeyword(
+    public ApiResponse<OrderListResponse> getOrdersByKeyword(
             @RequestParam("keyword") String keyword,
             @RequestParam("page") int page,
             @RequestParam("limit") int limit) {
-        try {
-            PageRequest pageRequest = PageRequest.of(page, limit, Sort.by("id").ascending());
-            // Just use the existing getAllUserOrders method, as we don't have a specific search method
-            // In a real implementation, we would add a search method in the service
-            Page<OrderResponse> orders = orderService.getAllUserOrders(pageRequest);
-            int totalPages = orders.getTotalPages();
-            List<OrderResponse> orderList = orders.getContent();
-
-            // Filter orders on the server side if keyword is provided
-            if (keyword != null && !keyword.trim().isEmpty()) {
-                String searchKeyword = keyword.toLowerCase();
-                orderList = orderList.stream()
+        PageRequest pageRequest = PageRequest.of(page, limit, Sort.by("id").ascending());
+        Page<OrderResponse> orders = orderService.getAllUserOrders(pageRequest);
+        List<OrderResponse> orderList = orders.getContent();
+        if (keyword != null && !keyword.trim().isEmpty()) {
+            String searchKeyword = keyword.toLowerCase();
+            orderList = orderList.stream()
                     .filter(order ->
-                        (order.getFullName() != null && order.getFullName().toLowerCase().contains(searchKeyword)) ||
-                        (order.getEmail() != null && order.getEmail().toLowerCase().contains(searchKeyword)) ||
-                        (order.getPhoneNumber() != null && order.getPhoneNumber().toLowerCase().contains(searchKeyword)) ||
-                        (order.getAddress() != null && order.getAddress().toLowerCase().contains(searchKeyword)) ||
-                        (order.getNote() != null && order.getNote().toLowerCase().contains(searchKeyword))
-                    )
+                            (order.getFullName() != null && order.getFullName().toLowerCase().contains(searchKeyword)) ||
+                                    (order.getEmail() != null && order.getEmail().toLowerCase().contains(searchKeyword)) ||
+                                    (order.getPhoneNumber() != null && order.getPhoneNumber().toLowerCase().contains(searchKeyword)) ||
+                                    (order.getAddress() != null && order.getAddress().toLowerCase().contains(searchKeyword)) ||
+                                    (order.getNote() != null && order.getNote().toLowerCase().contains(searchKeyword)))
                     .toList();
-            }
-
-            OrderListResponse orderListResponse = OrderListResponse.builder()
-                    .orders(orderList)
-                    .totalPages(totalPages)
-                    .build();
-            return ApiResponse.builder()
-                    .result(orderListResponse)
-                    .build();
-        } catch (Exception e) {
-            return ApiResponse.builder()
-                    .message("Error fetching orders: " + e.getMessage())
-                    .build();
         }
+
+        return ApiResponse.<OrderListResponse>builder()
+                .code(StatusCode.SUCCESS.getCode())
+                .message(StatusCode.SUCCESS.getMessage())
+                .result(OrderListResponse.builder()
+                        .orders(orderList)
+                        .totalPages(orders.getTotalPages())
+                        .build())
+                .build();
     }
 }

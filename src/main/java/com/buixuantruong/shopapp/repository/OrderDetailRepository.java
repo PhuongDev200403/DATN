@@ -14,30 +14,30 @@ public interface OrderDetailRepository extends JpaRepository<OrderDetail, Long> 
     List<OrderDetail> findByOrderId(Long id);
 
     @Query("""
-            SELECT od2.product.id, COUNT(od2.id)
+            SELECT od2.variant.product.id, COUNT(od2.id)
             FROM OrderDetail od1, OrderDetail od2
             WHERE od1.order.id = od2.order.id
-              AND od1.product.id = :productId
-              AND od2.product.id <> :productId
+              AND od1.variant.product.id = :productId
+              AND od2.variant.product.id <> :productId
               AND EXISTS (
                   SELECT 1 FROM Variant v
-                  WHERE v.product = od2.product
+                  WHERE v.product = od2.variant.product
                     AND v.isActive = true
               )
-            GROUP BY od2.product.id
+            GROUP BY od2.variant.product.id
             ORDER BY COUNT(od2.id) DESC
             """)
     List<Object[]> findFrequentlyBoughtTogetherProductIds(@Param("productId") Long productId);
 
     @Query("""
-            SELECT od.product.id, SUM(od.numberOfProducts)
+            SELECT od.variant.product.id, SUM(od.numberOfProducts)
             FROM OrderDetail od
             WHERE EXISTS (
                 SELECT 1 FROM Variant v
-                WHERE v.product = od.product
+                WHERE v.product = od.variant.product
                   AND v.isActive = true
             )
-            GROUP BY od.product.id
+            GROUP BY od.variant.product.id
             ORDER BY SUM(od.numberOfProducts) DESC
             """)
     List<Object[]> findTopSellingProductIds();

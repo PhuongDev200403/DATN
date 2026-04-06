@@ -1,5 +1,7 @@
 package com.buixuantruong.shopapp.model;
 
+import com.buixuantruong.shopapp.exception.AppException;
+import com.buixuantruong.shopapp.exception.StatusCode;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -19,6 +21,6 @@ public enum OAuth2Provider {
                 return oauth2Provider;
             }
         }
-        throw new IllegalArgumentException("No enum constant for provider: " + provider);
+        throw new AppException(StatusCode.SOCIAL_PROVIDER_INVALID);
     }
-} 
+}

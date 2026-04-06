@@ -1,13 +1,18 @@
 package com.buixuantruong.shopapp.service.impl;
 
+import com.buixuantruong.shopapp.dto.response.CartItemResponse;
+import com.buixuantruong.shopapp.dto.response.CartResponse;
+import com.buixuantruong.shopapp.exception.AppException;
+import com.buixuantruong.shopapp.exception.StatusCode;
+import com.buixuantruong.shopapp.mapper.VariantMapper;
 import com.buixuantruong.shopapp.model.Cart;
 import com.buixuantruong.shopapp.model.CartItem;
-import com.buixuantruong.shopapp.model.Product;
 import com.buixuantruong.shopapp.model.User;
+import com.buixuantruong.shopapp.model.Variant;
 import com.buixuantruong.shopapp.repository.CartItemRepository;
 import com.buixuantruong.shopapp.repository.CartRepository;
-import com.buixuantruong.shopapp.repository.ProductRepository;
 import com.buixuantruong.shopapp.repository.UserRepository;
+import com.buixuantruong.shopapp.repository.VariantRepository;
 import com.buixuantruong.shopapp.service.CartService;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -27,26 +32,29 @@ public class CartServiceImpl implements CartService {
 
     CartRepository cartRepository;
     CartItemRepository cartItemRepository;
-    ProductRepository productRepository;
+    VariantRepository variantRepository;
     UserRepository userRepository;
+    VariantMapper variantMapper;
 
     @Override
-    public Cart getCart(Long userId) {
-        return cartRepository.findByUserId(userId)
-                .orElseGet(() -> createNewCart(userId));
+    public CartResponse getCart(Long userId) {
+        return toCartResponse(getOrCreateCart(userId));
     }
 
     @Override
     @Transactional
-    public Cart addToCart(Long userId, Long productId, Integer quantity) {
-        Cart cart = getCart(userId);
-        Product product = productRepository.findById(productId)
-                .orElseThrow(() -> new RuntimeException("Product not found"));
+    public CartResponse addToCart(Long userId, Long variantId, Integer quantity) {
+        validateQuantity(quantity);
 
-        Optional<CartItem> existingItem = cart.getCartItems().stream()
-                .filter(item -> item.getProduct().getId().equals(productId))
-                .findFirst();
+        Cart cart = getOrCreateCart(userId);
+        Variant variant = findVariant(variantId);
+        int currentQuantity = findCartItem(cart, variantId)
+                .map(CartItem::getQuantity)
+                .orElse(0);
 
+        ensureEnoughStock(variant, currentQuantity + quantity);
+
+        Optional<CartItem> existingItem = findCartItem(cart, variantId);
         if (existingItem.isPresent()) {
             CartItem item = existingItem.get();
             item.setQuantity(item.getQuantity() + quantity);
@@ -54,45 +62,43 @@ public class CartServiceImpl implements CartService {
         } else {
             CartItem newItem = CartItem.builder()
                     .cart(cart)
-                    .product(product)
+                    .variant(variant)
                     .quantity(quantity)
                     .build();
             cartItemRepository.save(newItem);
             cart.getCartItems().add(newItem);
         }
-        return cartRepository.save(cart);
+
+        return toCartResponse(cartRepository.save(cart));
     }
 
     @Override
     @Transactional
-    public Cart updateQuantity(Long userId, Long productId, Integer quantity) {
-        Cart cart = getCart(userId);
-        CartItem item = cart.getCartItems().stream()
-                .filter(i -> i.getProduct().getId().equals(productId))
-                .findFirst()
-                .orElseThrow(() -> new RuntimeException("Item not found in cart"));
+    public CartResponse updateQuantity(Long userId, Long variantId, Integer quantity) {
+        Cart cart = getOrCreateCart(userId);
+        CartItem item = findCartItem(cart, variantId)
+                .orElseThrow(() -> new AppException(StatusCode.CART_ITEM_NOT_FOUND));
 
-        if (quantity <= 0) {
+        if (quantity == null || quantity <= 0) {
             cart.getCartItems().remove(item);
             cartItemRepository.delete(item);
-        } else {
-            item.setQuantity(quantity);
-            cartItemRepository.save(item);
+            return toCartResponse(cartRepository.save(cart));
         }
-        return cartRepository.save(cart);
+
+        ensureEnoughStock(item.getVariant(), quantity);
+        item.setQuantity(quantity);
+        cartItemRepository.save(item);
+        return toCartResponse(cartRepository.save(cart));
     }
 
     @Override
     @Transactional
-    public void removeFromCart(Long userId, Long productId) {
-        Cart cart = getCart(userId);
-        cart.getCartItems().removeIf(item -> {
-            if (item.getProduct().getId().equals(productId)) {
-                cartItemRepository.delete(item);
-                return true;
-            }
-            return false;
-        });
+    public void removeFromCart(Long userId, Long variantId) {
+        Cart cart = getOrCreateCart(userId);
+        CartItem item = findCartItem(cart, variantId)
+                .orElseThrow(() -> new AppException(StatusCode.CART_ITEM_NOT_FOUND));
+        cart.getCartItems().remove(item);
+        cartItemRepository.delete(item);
         cartRepository.save(cart);
     }
 
@@ -109,21 +115,84 @@ public class CartServiceImpl implements CartService {
     @Override
     @Transactional
     public void syncCart(Long userId, List<Map<String, Object>> items) {
-        Cart cart = getCart(userId);
+        Cart cart = getOrCreateCart(userId);
+        cartItemRepository.deleteAll(cart.getCartItems());
+        cart.getCartItems().clear();
+
         for (Map<String, Object> itemData : items) {
-            Long productId = Long.valueOf(String.valueOf(itemData.get("product_id")));
+            Long variantId = Long.valueOf(String.valueOf(itemData.get("variant_id")));
             Integer quantity = Integer.valueOf(String.valueOf(itemData.get("quantity")));
-            addToCart(userId, productId, quantity);
+            if (quantity <= 0) {
+                continue;
+            }
+
+            Variant variant = findVariant(variantId);
+            ensureEnoughStock(variant, quantity);
+
+            CartItem cartItem = CartItem.builder()
+                    .cart(cart)
+                    .variant(variant)
+                    .quantity(quantity)
+                    .build();
+            cart.getCartItems().add(cartItem);
         }
+
+        cartRepository.save(cart);
+    }
+
+    private Cart getOrCreateCart(Long userId) {
+        return cartRepository.findByUserId(userId)
+                .orElseGet(() -> createNewCart(userId));
     }
 
     private Cart createNewCart(Long userId) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new AppException(StatusCode.USER_NOT_FOUND));
         Cart cart = Cart.builder()
                 .user(user)
                 .cartItems(new ArrayList<>())
                 .build();
         return cartRepository.save(cart);
+    }
+
+    private Variant findVariant(Long variantId) {
+        return variantRepository.findById(variantId)
+                .orElseThrow(() -> new AppException(StatusCode.VARIANT_NOT_FOUND));
+    }
+
+    private Optional<CartItem> findCartItem(Cart cart, Long variantId) {
+        List<CartItem> cartItems = cart.getCartItems();
+        if (cartItems == null) {
+            return Optional.empty();
+        }
+        return cartItems.stream()
+                .filter(item -> item.getVariant() != null && item.getVariant().getId().equals(variantId))
+                .findFirst();
+    }
+
+    private void validateQuantity(Integer quantity) {
+        if (quantity == null || quantity <= 0) {
+            throw new AppException(StatusCode.INVALID_QUANTITY);
+        }
+    }
+
+    private void ensureEnoughStock(Variant variant, int requiredQuantity) {
+        long availableStock = variant.getStock() == null ? 0L : variant.getStock();
+        if (availableStock < requiredQuantity) {
+            throw new AppException(StatusCode.INVALID_QUANTITY);
+        }
+    }
+
+    private CartResponse toCartResponse(Cart cart) {
+        List<CartItemResponse> itemResponses = cart.getCartItems() == null
+                ? List.of()
+                : cart.getCartItems().stream()
+                .map(item -> CartItemResponse.builder()
+                        .quantity(item.getQuantity())
+                        .variantResponse(variantMapper.toResponse(item.getVariant()))
+                        .build())
+                .toList();
+
+        return new CartResponse(cart.getId(), cart.getUser().getId(), itemResponses);
     }
 }

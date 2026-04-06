@@ -18,4 +18,5 @@ public class SpecificationDTO {
     private Integer length;
     private Integer width;
     private Integer height;
+    private Integer ram;
 }

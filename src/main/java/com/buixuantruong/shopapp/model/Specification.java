@@ -40,4 +40,7 @@ public class Specification extends BaseEntity {
 
     @Column(name = "height")
     private Integer height;
+
+    @Column(name = "ram")
+    private Integer ram;
 }

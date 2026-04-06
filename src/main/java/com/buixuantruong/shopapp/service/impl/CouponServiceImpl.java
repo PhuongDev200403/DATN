@@ -1,18 +1,24 @@
 package com.buixuantruong.shopapp.service.impl;
 
+import com.buixuantruong.shopapp.dto.ApplyCouponRequest;
 import com.buixuantruong.shopapp.dto.CouponDTO;
-import com.buixuantruong.shopapp.dto.response.ApiResponse;
 import com.buixuantruong.shopapp.dto.response.CouponResponse;
-import com.buixuantruong.shopapp.exception.DataNotFoundException;
+import com.buixuantruong.shopapp.dto.response.MessageResponse;
+import com.buixuantruong.shopapp.exception.AppException;
 import com.buixuantruong.shopapp.exception.StatusCode;
+import com.buixuantruong.shopapp.mapper.CouponMapper;
 import com.buixuantruong.shopapp.model.Coupon;
 import com.buixuantruong.shopapp.model.CouponType;
 import com.buixuantruong.shopapp.repository.CouponRepository;
 import com.buixuantruong.shopapp.service.CouponService;
+import jakarta.transaction.Transactional;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import org.springframework.stereotype.Service;
+
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -22,126 +28,179 @@ import java.util.List;
 public class CouponServiceImpl implements CouponService {
 
     CouponRepository couponRepository;
+    CouponMapper couponMapper;
 
     @Override
-    public ApiResponse<Object> createCoupon(CouponDTO couponDTO) throws Exception {
-        if (couponRepository.existsByCode(couponDTO.getCode())) {
-            throw new Exception("Coupon code already exists");
+    @Transactional
+    public CouponResponse createCoupon(CouponDTO couponDTO) {
+        String normalizedCode = normalizeCode(couponDTO.getCode());
+        if (couponRepository.existsByCodeIgnoreCase(normalizedCode)) {
+            throw new AppException(StatusCode.COUPON_CODE_EXISTED);
         }
-        Coupon coupon = Coupon.builder()
-                .code(couponDTO.getCode())
-                .type(parseCouponType(couponDTO.getType()))
-                .value(couponDTO.getValue())
-                .minimumAmount(couponDTO.getMinimumAmount())
-                .startAt(couponDTO.getStartAt())
-                .endAt(couponDTO.getEndAt())
-                .active(couponDTO.isActive())
-                .build();
-        return ApiResponse.builder()
-                .code(StatusCode.SUCCESS.getCode())
-                .message(StatusCode.SUCCESS.getMessage())
-                .result(couponRepository.save(coupon))
-                .build();
+
+        validateCouponDto(couponDTO);
+
+        Coupon coupon = couponMapper.toEntity(couponDTO);
+        coupon.setCode(normalizedCode);
+        coupon.setUsedCount(0);
+        return couponMapper.toResponse(couponRepository.save(coupon));
     }
 
     @Override
-    public ApiResponse<Object> updateCoupon(Long id, CouponDTO couponDTO) throws Exception {
-        Coupon coupon = couponRepository.findById(id)
-                .orElseThrow(() -> new DataNotFoundException("Coupon not found"));
-        
-        coupon.setCode(couponDTO.getCode());
-        coupon.setType(parseCouponType(couponDTO.getType()));
-        coupon.setValue(couponDTO.getValue());
-        coupon.setMinimumAmount(couponDTO.getMinimumAmount());
-        coupon.setStartAt(couponDTO.getStartAt());
-        coupon.setEndAt(couponDTO.getEndAt());
-        coupon.setActive(couponDTO.isActive());
-        
-        return ApiResponse.builder()
-                .code(StatusCode.SUCCESS.getCode())
-                .message(StatusCode.SUCCESS.getMessage())
-                .result(couponRepository.save(coupon))
-                .build();
+    @Transactional
+    public CouponResponse updateCoupon(Long id, CouponDTO couponDTO) {
+        Coupon coupon = getCouponEntityById(id);
+        String normalizedCode = normalizeCode(couponDTO.getCode());
+        boolean duplicatedCode = !coupon.getCode().equalsIgnoreCase(normalizedCode)
+                && couponRepository.existsByCodeIgnoreCase(normalizedCode);
+        if (duplicatedCode) {
+            throw new AppException(StatusCode.COUPON_CODE_EXISTED);
+        }
+
+        validateCouponDto(couponDTO);
+        couponMapper.updateEntity(couponDTO, coupon);
+        coupon.setCode(normalizedCode);
+        return couponMapper.toResponse(couponRepository.save(coupon));
     }
 
     @Override
-    public ApiResponse<Object> getAllCoupons() {
-        List<Coupon> coupons = couponRepository.findAll();
-        return ApiResponse.builder()
-                .code(StatusCode.SUCCESS.getCode())
-                .message(StatusCode.SUCCESS.getMessage())
-                .result(coupons)
-                .build();
+    public List<CouponResponse> getAllCoupons() {
+        return couponRepository.findAll().stream()
+                .map(couponMapper::toResponse)
+                .toList();
     }
 
     @Override
-    public ApiResponse<Object> getCouponById(Long id) {
-        Coupon coupon = couponRepository.findById(id).orElse(null);
-        return ApiResponse.builder()
-                .code(StatusCode.SUCCESS.getCode())
-                .message(StatusCode.SUCCESS.getMessage())
-                .result(coupon)
-                .build();
+    public CouponResponse getCouponById(Long id) {
+        return couponMapper.toResponse(getCouponEntityById(id));
     }
 
     @Override
-    public ApiResponse<Object> deleteCoupon(Long id) {
-        couponRepository.deleteById(id);
-        return ApiResponse.builder()
-                .code(StatusCode.SUCCESS.getCode())
-                .message(StatusCode.SUCCESS.getMessage())
-                .result("Coupon deleted successfully")
-                .build();
+    @Transactional
+    public MessageResponse deleteCoupon(Long id) {
+        Coupon coupon = getCouponEntityById(id);
+        couponRepository.delete(coupon);
+        return MessageResponse.builder().message("Coupon deleted successfully").build();
     }
 
     @Override
-    public ApiResponse<Object> calculateDiscount(String code, Double totalAmount) {
-        Coupon coupon = couponRepository.findByCode(code).orElse(null);
-        
-        if (coupon == null || !coupon.isActive()) {
-            return ApiResponse.builder().code(400).message("Invalid or inactive coupon").build();
+    @Transactional
+    public CouponResponse activateCoupon(Long id) {
+        Coupon coupon = getCouponEntityById(id);
+        coupon.setActive(true);
+        return couponMapper.toResponse(couponRepository.save(coupon));
+    }
+
+    @Override
+    @Transactional
+    public CouponResponse deactivateCoupon(Long id) {
+        Coupon coupon = getCouponEntityById(id);
+        coupon.setActive(false);
+        return couponMapper.toResponse(couponRepository.save(coupon));
+    }
+
+    @Override
+    public CouponResponse applyCoupon(ApplyCouponRequest request) {
+        Coupon coupon = couponRepository.findByCodeIgnoreCase(normalizeCode(request.getCode()))
+                .orElseThrow(() -> new AppException(StatusCode.COUPON_NOT_FOUND));
+
+        validateCouponForAmount(coupon, request.getTotalAmount());
+
+        BigDecimal discountAmount = calculateDiscountAmount(coupon, request.getTotalAmount());
+        CouponResponse response = couponMapper.toResponse(coupon);
+        response.setDiscountAmount(discountAmount);
+        return response;
+    }
+
+    @Override
+    @Transactional
+    public BigDecimal markCouponAsUsed(Long couponId) {
+        Coupon coupon = couponRepository.findByIdForUpdate(couponId)
+                .orElseThrow(() -> new AppException(StatusCode.COUPON_NOT_FOUND));
+
+        validateCouponForUsage(coupon);
+        coupon.setUsedCount(coupon.getUsedCount() + 1);
+        couponRepository.save(coupon);
+        return coupon.getValue();
+    }
+
+    private Coupon getCouponEntityById(Long id) {
+        return couponRepository.findById(id)
+                .orElseThrow(() -> new AppException(StatusCode.COUPON_NOT_FOUND));
+    }
+
+    private void validateCouponDto(CouponDTO couponDTO) {
+        if (couponDTO.getType() == null) {
+            throw new AppException(StatusCode.INVALID_COUPON_TYPE);
+        }
+        if (couponDTO.getValue() == null || couponDTO.getValue().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new AppException(StatusCode.INVALID_DATA);
+        }
+        if (couponDTO.getUsageLimit() == null || couponDTO.getUsageLimit() <= 0) {
+            throw new AppException(StatusCode.INVALID_DATA);
+        }
+        if (couponDTO.getMinimumAmount() != null && couponDTO.getMinimumAmount().compareTo(BigDecimal.ZERO) < 0) {
+            throw new AppException(StatusCode.INVALID_DATA);
+        }
+        if (couponDTO.getMaxDiscount() != null && couponDTO.getMaxDiscount().compareTo(BigDecimal.ZERO) < 0) {
+            throw new AppException(StatusCode.INVALID_DATA);
+        }
+        if (couponDTO.getStartAt() != null && couponDTO.getEndAt() != null && couponDTO.getEndAt().isBefore(couponDTO.getStartAt())) {
+            throw new AppException(StatusCode.INVALID_DATA);
+        }
+    }
+
+    private void validateCouponForAmount(Coupon coupon, BigDecimal totalAmount) {
+        if (totalAmount == null || totalAmount.compareTo(BigDecimal.ZERO) < 0) {
+            throw new AppException(StatusCode.INVALID_DATA);
+        }
+
+        validateCouponForUsage(coupon);
+        if (coupon.getMinimumAmount() != null && totalAmount.compareTo(coupon.getMinimumAmount()) < 0) {
+            throw new AppException(StatusCode.ORDER_AMOUNT_BELOW_MINIMUM);
+        }
+    }
+
+    private void validateCouponForUsage(Coupon coupon) {
+        if (!coupon.isActive()) {
+            throw new AppException(StatusCode.INVALID_COUPON);
         }
 
         LocalDateTime now = LocalDateTime.now();
-        if ((coupon.getStartAt() != null && now.isBefore(coupon.getStartAt())) ||
-            (coupon.getEndAt() != null && now.isAfter(coupon.getEndAt()))) {
-            return ApiResponse.builder().code(400).message("Coupon is expired or not yet started").build();
+        if ((coupon.getStartAt() != null && now.isBefore(coupon.getStartAt()))
+                || (coupon.getEndAt() != null && now.isAfter(coupon.getEndAt()))) {
+            throw new AppException(StatusCode.COUPON_NOT_AVAILABLE);
         }
 
-        if (coupon.getMinimumAmount() != null && totalAmount < coupon.getMinimumAmount()) {
-            return ApiResponse.builder().code(400).message("Order amount is below minimum required").build();
+        if (coupon.getUsedCount() != null
+                && coupon.getUsageLimit() != null
+                && coupon.getUsedCount() >= coupon.getUsageLimit()) {
+            throw new AppException(StatusCode.COUPON_USAGE_LIMIT_EXCEEDED);
         }
-
-        double discountAmount = 0;
-        if (coupon.getType() == CouponType.PECENTAGE) {
-            discountAmount = totalAmount * (coupon.getValue() / 100);
-        } else {
-            discountAmount = coupon.getValue();
-        }
-
-        CouponResponse response = CouponResponse.builder()
-                .id(coupon.getId())
-                .code(coupon.getCode())
-                .type(coupon.getType().name())
-                .value(coupon.getValue())
-                .discountAmount(discountAmount)
-                .build();
-
-        return ApiResponse.builder()
-                .code(StatusCode.SUCCESS.getCode())
-                .message(StatusCode.SUCCESS.getMessage())
-                .result(response)
-                .build();
     }
 
-    private CouponType parseCouponType(String type) {
-        if (type == null) {
-            throw new IllegalArgumentException("Coupon type is required");
-        }
-        return switch (type.trim().toLowerCase()) {
-            case "percentage" -> CouponType.PECENTAGE;
-            case "fixed" -> CouponType.FIXED;
-            default -> throw new IllegalArgumentException("Unsupported coupon type: " + type);
+    private BigDecimal calculateDiscountAmount(Coupon coupon, BigDecimal totalAmount) {
+        BigDecimal discount = switch (coupon.getType()) {
+            case PERCENTAGE -> totalAmount
+                    .multiply(coupon.getValue())
+                    .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+            case FIXED -> coupon.getValue();
         };
+
+        if (coupon.getMaxDiscount() != null && discount.compareTo(coupon.getMaxDiscount()) > 0) {
+            discount = coupon.getMaxDiscount();
+        }
+        if (discount.compareTo(totalAmount) > 0) {
+            discount = totalAmount;
+        }
+
+        return discount.max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private String normalizeCode(String code) {
+        if (code == null || code.isBlank()) {
+            throw new AppException(StatusCode.INVALID_COUPON);
+        }
+        return code.trim().toUpperCase();
     }
 }

@@ -1,11 +1,9 @@
 package com.buixuantruong.shopapp.service.impl;
 
 import com.buixuantruong.shopapp.dto.UpdateUserDTO;
-import com.buixuantruong.shopapp.dto.response.ApiResponse;
 import com.buixuantruong.shopapp.dto.UserDTO;
-import com.buixuantruong.shopapp.exception.DataNotFoundException;
-import com.buixuantruong.shopapp.exception.ExpiredTokenException;
-import com.buixuantruong.shopapp.exception.PermissionException;
+import com.buixuantruong.shopapp.dto.response.UserResponse;
+import com.buixuantruong.shopapp.exception.AppException;
 import com.buixuantruong.shopapp.exception.StatusCode;
 import com.buixuantruong.shopapp.model.Role;
 import com.buixuantruong.shopapp.model.SocialAccount;
@@ -13,11 +11,11 @@ import com.buixuantruong.shopapp.model.User;
 import com.buixuantruong.shopapp.repository.SocialAccountRepository;
 import com.buixuantruong.shopapp.repository.UserRepository;
 import com.buixuantruong.shopapp.security.jwt.JWTTokenUtil;
+import com.buixuantruong.shopapp.service.UserService;
 import jakarta.transaction.Transactional;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -30,7 +28,7 @@ import java.util.Optional;
 @Service
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
-public class UserServiceImpl implements com.buixuantruong.shopapp.service.UserService {
+public class UserServiceImpl implements UserService {
     UserRepository userRepository;
     SocialAccountRepository socialAccountRepository;
     PasswordEncoder passwordEncoder;
@@ -39,17 +37,17 @@ public class UserServiceImpl implements com.buixuantruong.shopapp.service.UserSe
 
     @Override
     @Transactional
-    public ApiResponse<Object> createUser(UserDTO userDTO) throws Exception{
+    public UserResponse createUser(UserDTO userDTO) {
         String phoneNumber = userDTO.getPhoneNumber();
-        if(userRepository.existsByPhoneNumber(phoneNumber)) {
-            throw new DataIntegrityViolationException("Phone number already exists");
+        if (userRepository.existsByPhoneNumber(phoneNumber)) {
+            throw new AppException(StatusCode.USER_EXISTED);
         }
         Role role = userDTO.getRole();
         if (role == null) {
-            throw new DataNotFoundException("Role not found");
+            throw new AppException(StatusCode.ROLE_NOT_FOUND);
         }
         if (role == Role.ADMIN) {
-            throw new PermissionException("Cannot create user with admin role");
+            throw new AppException(StatusCode.ADMIN_ROLE_NOT_ALLOWED);
         }
         User newUser = User.builder()
                 .fullName(userDTO.getFullName())
@@ -63,14 +61,9 @@ public class UserServiceImpl implements com.buixuantruong.shopapp.service.UserSe
         newUser.setRole(role);
 
         boolean isSocialLogin = userDTO.getSocialProvider() != null && userDTO.getSocialProviderId() != null;
-        
-        if(!isSocialLogin) {
-            // Người dùng thông thường, mã hóa mật khẩu
-            String password = userDTO.getPassword();
-            String encodedPassword = passwordEncoder.encode(password);
-            newUser.setPassword(encodedPassword);
+        if (!isSocialLogin) {
+            newUser.setPassword(passwordEncoder.encode(userDTO.getPassword()));
         } else {
-            // Người dùng đăng nhập xã hội
             SocialAccount socialAccount = SocialAccount.builder()
                     .provider(userDTO.getSocialProvider())
                     .providerId(userDTO.getSocialProviderId())
@@ -81,31 +74,21 @@ public class UserServiceImpl implements com.buixuantruong.shopapp.service.UserSe
             socialAccount.setUser(newUser);
             newUser.getSocialAccounts().add(socialAccount);
         }
-        
-        User savedUser = userRepository.save(newUser);
-        
-        return ApiResponse.builder()
-                .code(StatusCode.SUCCESS.getCode())
-                .message(StatusCode.SUCCESS.getMessage())
-                .result(savedUser)
-                .build();
+
+        return UserResponse.fromUser(userRepository.save(newUser));
     }
 
     @Override
-    public String login(String phoneNumber, String password) throws DataNotFoundException {
+    public String login(String phoneNumber, String password) {
         Optional<User> optionalUser = userRepository.findByPhoneNumber(phoneNumber);
-        if(optionalUser.isEmpty()){
-            throw new DataNotFoundException("Invalid phone number or password");
+        if (optionalUser.isEmpty()) {
+            throw new AppException(StatusCode.INVALID_CREDENTIALS);
         }
         User existingUser = optionalUser.get();
 
-        // Kiểm tra nếu đây là tài khoản thông thường (không phải social login)
         boolean isSocialUser = existingUser.getSocialAccounts() != null && !existingUser.getSocialAccounts().isEmpty();
-        
-        if(!isSocialUser){
-            if(!passwordEncoder.matches(password, existingUser.getPassword())){
-                throw new DataNotFoundException("Invalid phone number or password");
-            }
+        if (!isSocialUser && !passwordEncoder.matches(password, existingUser.getPassword())) {
+            throw new AppException(StatusCode.INVALID_CREDENTIALS);
         }
 
         UsernamePasswordAuthenticationToken authenticationToken =
@@ -115,69 +98,41 @@ public class UserServiceImpl implements com.buixuantruong.shopapp.service.UserSe
     }
 
     @Override
-    public User getUserDetailByToken(String token) throws Exception {
+    public User getUserDetailByToken(String token) {
         if (jwtTokenUtil.isTokenExpired(token)) {
-            throw new ExpiredTokenException("Token is expired");
+            throw new AppException(StatusCode.INVALID_TOKEN);
         }
         String phoneNumber = jwtTokenUtil.extractPhoneNumber(token);
-        Optional<User> user = userRepository.findByPhoneNumber(phoneNumber);
-
-        if (user.isPresent()) {
-            return user.get();
-        } else {
-            throw new Exception("User not found");
-        }
+        return userRepository.findByPhoneNumber(phoneNumber)
+                .orElseThrow(() -> new AppException(StatusCode.USER_NOT_FOUND));
     }
 
     @Transactional
     @Override
-    public User updateUser(Long userId, UpdateUserDTO updatedUserDTO) throws Exception {
+    public User updateUser(Long userId, UpdateUserDTO updatedUserDTO) {
         User existingUser = userRepository.findById(userId)
-                .orElseThrow(() -> new DataNotFoundException("User not found"));
+                .orElseThrow(() -> new AppException(StatusCode.USER_NOT_FOUND));
         String newPhoneNumber = updatedUserDTO.getPhoneNumber();
         if (newPhoneNumber != null && !existingUser.getPhoneNumber().equals(newPhoneNumber) &&
                 userRepository.existsByPhoneNumber(newPhoneNumber)) {
-            throw new DataIntegrityViolationException("Phone number already exists");
+            throw new AppException(StatusCode.USER_EXISTED);
         }
 
-        if (updatedUserDTO.getFullName() != null) {
-            existingUser.setFullName(updatedUserDTO.getFullName());
-        }
-        if (newPhoneNumber != null) {
-            existingUser.setPhoneNumber(newPhoneNumber);
-        }
-        if (updatedUserDTO.getAddress() != null) {
-            existingUser.setAddress(updatedUserDTO.getAddress());
-        }
-        if (updatedUserDTO.getDateOfBirth() != null) {
-            existingUser.setDateOfBirth(updatedUserDTO.getDateOfBirth());
-        }
-        if (updatedUserDTO.getEmail() != null) {
-            existingUser.setEmail(updatedUserDTO.getEmail());
-        }
-        if (updatedUserDTO.getAvatarUrl() != null) {
-            existingUser.setAvatarUrl(updatedUserDTO.getAvatarUrl());
-        }
-        
-        // Xử lý cập nhật tài khoản xã hội nếu cần
+        if (updatedUserDTO.getFullName() != null) existingUser.setFullName(updatedUserDTO.getFullName());
+        if (newPhoneNumber != null) existingUser.setPhoneNumber(newPhoneNumber);
+        if (updatedUserDTO.getAddress() != null) existingUser.setAddress(updatedUserDTO.getAddress());
+        if (updatedUserDTO.getDateOfBirth() != null) existingUser.setDateOfBirth(updatedUserDTO.getDateOfBirth());
+        if (updatedUserDTO.getEmail() != null) existingUser.setEmail(updatedUserDTO.getEmail());
+        if (updatedUserDTO.getAvatarUrl() != null) existingUser.setAvatarUrl(updatedUserDTO.getAvatarUrl());
+
         if (updatedUserDTO.getSocialProvider() != null && updatedUserDTO.getSocialProviderId() != null) {
-            // Tìm tài khoản xã hội hiện có với provider tương tự
             SocialAccount existingSocialAccount = existingUser.getSocialAccount(updatedUserDTO.getSocialProvider());
-            
             if (existingSocialAccount != null) {
-                // Cập nhật tài khoản xã hội hiện có
                 existingSocialAccount.setProviderId(updatedUserDTO.getSocialProviderId());
-                if (updatedUserDTO.getEmail() != null) {
-                    existingSocialAccount.setEmail(updatedUserDTO.getEmail());
-                }
-                if (updatedUserDTO.getFullName() != null) {
-                    existingSocialAccount.setName(updatedUserDTO.getFullName());
-                }
-                if (updatedUserDTO.getAvatarUrl() != null) {
-                    existingSocialAccount.setPictureUrl(updatedUserDTO.getAvatarUrl());
-                }
+                if (updatedUserDTO.getEmail() != null) existingSocialAccount.setEmail(updatedUserDTO.getEmail());
+                if (updatedUserDTO.getFullName() != null) existingSocialAccount.setName(updatedUserDTO.getFullName());
+                if (updatedUserDTO.getAvatarUrl() != null) existingSocialAccount.setPictureUrl(updatedUserDTO.getAvatarUrl());
             } else {
-                // Tạo tài khoản xã hội mới
                 SocialAccount newSocialAccount = SocialAccount.builder()
                         .provider(updatedUserDTO.getSocialProvider())
                         .providerId(updatedUserDTO.getSocialProviderId())
@@ -186,7 +141,7 @@ public class UserServiceImpl implements com.buixuantruong.shopapp.service.UserSe
                         .pictureUrl(updatedUserDTO.getAvatarUrl())
                         .user(existingUser)
                         .build();
-                
+
                 if (existingUser.getSocialAccounts() == null) {
                     existingUser.setSocialAccounts(new ArrayList<>());
                 }
@@ -194,30 +149,24 @@ public class UserServiceImpl implements com.buixuantruong.shopapp.service.UserSe
             }
         }
 
-        // Cập nhật mật khẩu nếu được cung cấp
         if (updatedUserDTO.getPassword() != null && !updatedUserDTO.getPassword().isEmpty()) {
             if (!updatedUserDTO.getPassword().equals(updatedUserDTO.getRetypePassword())) {
-                throw new DataNotFoundException("Password and retype password not the same");
+                throw new AppException(StatusCode.PASSWORD_NOT_MATCH);
             }
-            String newPassword = updatedUserDTO.getPassword();
-            String encodedPassword = passwordEncoder.encode(newPassword);
-            existingUser.setPassword(encodedPassword);
+            existingUser.setPassword(passwordEncoder.encode(updatedUserDTO.getPassword()));
         }
-        
+
         return userRepository.save(existingUser);
     }
 
     @Override
-    public void deleteUser(Long userId) throws Exception {
-        User user = userRepository.findById(userId).orElseThrow();
-
+    public void deleteUser(Long userId) {
+        User user = userRepository.findById(userId).orElseThrow(() -> new AppException(StatusCode.USER_NOT_FOUND));
         userRepository.delete(user);
     }
 
     @Override
     public List<UserDTO> getAllUsers() throws Exception {
-//        return userRepository.findAll().stream()
-//                .map((element) -> modelMapper.map(element, UserResponse.class)).toList();
         return null;
     }
 }

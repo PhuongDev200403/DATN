@@ -3,6 +3,8 @@ package com.buixuantruong.shopapp.model;
 import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
+
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
@@ -19,31 +21,33 @@ public class Coupon {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     Long id;
 
-    @Column(name = "code", nullable = false, unique = true)
+    @Column(nullable = false, unique = true)
     String code;
 
-    @Column(name = "type", nullable = false)
-    CouponType type; // "percentage" hoặc "fixed"
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    CouponType type;
 
-    @Column(name = "value", nullable = false)
-    Double value; // Giá trị giảm (vd: 10.0 cho 10% hoặc 50000.0 cho tiền mặt)
+    @Column(nullable = false, precision = 15, scale = 2)
+    BigDecimal value;
 
-    @Column(name = "usage_limit", nullable = false)
-    private Integer usageLimit;
+    @Column(nullable = false)
+    Integer usageLimit;
 
-    @Column(name = "use_count", nullable = false)
-    private Integer usedCount;
+    @Builder.Default
+    @Column(nullable = false)
+    Integer usedCount = 0;
 
-    @Column(name = "minimum_amount")
-    Double minimumAmount; // Giá trị đơn hàng tối thiểu để áp dụng
+    @Column(precision = 15, scale = 2)
+    BigDecimal minimumAmount;
 
-    @Column(name = "start_at")
+    @Column(precision = 15, scale = 2)
+    BigDecimal maxDiscount;
+
     LocalDateTime startAt;
 
-    @Column(name = "end_at")
     LocalDateTime endAt;
 
-    @Column(name = "is_active")
     @Builder.Default
     boolean active = true;
 }

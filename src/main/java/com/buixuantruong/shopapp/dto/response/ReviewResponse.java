@@ -12,7 +12,6 @@ import java.time.LocalDateTime;
 @Builder
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class ReviewResponse {
-
     Long id;
     Long userId;
     String userName;
@@ -24,18 +23,18 @@ public class ReviewResponse {
     LocalDateTime createdAt;
     LocalDateTime updatedAt;
 
-    public static ReviewResponse fromReview(Review review) {
-        return ReviewResponse.builder()
-                .id(review.getId())
-                .userId(review.getUser().getId())
-                .userName(review.getUser().getFullName())
-                .userAvatar(review.getUser().getAvatarUrl())
-                .productId(review.getProduct().getId())
-                .comment(review.getComment())
-                .rating(review.getRating())
-                .adminResponse(review.getAdminResponse())
-                .createdAt(review.getCreateAt())
-                .updatedAt(review.getUpdatedAt())
-                .build();
-    }
+//    public static ReviewResponse fromReview(Review review) {
+//        return ReviewResponse.builder()
+//                .id(review.getId())
+//                .userId(review.getUser().getId())
+//                .userName(review.getUser().getFullName())
+//                .userAvatar(review.getUser().getAvatarUrl())
+//                .productId(review.getProduct().getId())
+//                .comment(review.getComment())
+//                .rating(review.getRating())
+//                .adminResponse(review.getAdminResponse())
+//                .createdAt(review.getCreateAt())
+//                .updatedAt(review.getUpdatedAt())
+//                .build();
+//    }
 }

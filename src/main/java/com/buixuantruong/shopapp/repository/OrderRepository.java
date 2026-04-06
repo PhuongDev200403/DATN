@@ -38,13 +38,14 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
 
     // Top N sản phẩm bán chạy nhất
     @Query(value = """
-        SELECT od.product_id, p.name, SUM(od.number_of_products) as total_sold,
+        SELECT v.product_id, p.name, SUM(od.number_of_products) as total_sold,
                SUM(od.number_of_products * od.price) as total_revenue
         FROM order_details od
-        JOIN products p ON od.product_id = p.id
+        JOIN product_variants v ON od.variant_id = v.id
+        JOIN products p ON v.product_id = p.id
         JOIN orders o ON od.order_id = o.id
         WHERE o.status = 'DELIVERED'
-        GROUP BY od.product_id, p.name
+        GROUP BY v.product_id, p.name
         ORDER BY total_sold DESC
         LIMIT :limit
         """, nativeQuery = true)

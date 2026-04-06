@@ -19,26 +19,10 @@ public class ProductDTO {
     @Size(min = 3, max = 200, message = "title must be at least 3 characters")
     private String name;
 
-    @Min(value = 0, message = "price must be higher than or equal to 0")
-    private float price;
-
-    private String thumbnail;
-
     private String description;
 
     private Long categoryId;
 
-    private Integer width;
-
-    private Integer height;
-
-    private Integer length;
-
-    private Integer weight;
-
-    @Min(value = 0, message = "quantity must be greater than or equal to 0")
-    private Long quantity;
-
-    @Valid
-    private List<VariantDTO> variants;
+//    @Valid
+//    private List<VariantDTO> variants;
 }

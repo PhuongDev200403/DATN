@@ -8,6 +8,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/v1/shipping")
 @RequiredArgsConstructor
@@ -17,40 +19,40 @@ public class ShippingController {
     GHNService ghnService;
 
     @GetMapping("/provinces")
-    public ApiResponse<Object> getProvinces() {
-        return ApiResponse.builder()
+    public ApiResponse<List<?>> getProvinces() {
+        return ApiResponse.<List<?>>builder()
                 .code(StatusCode.SUCCESS.getCode())
-                .message("Lấy danh sách tỉnh thành thành công")
+                .message("Get provinces successfully")
                 .result(ghnService.getProvinces())
                 .build();
     }
 
     @GetMapping("/districts/{provinceId}")
-    public ApiResponse<Object> getDistricts(@PathVariable Integer provinceId) {
-        return ApiResponse.builder()
+    public ApiResponse<List<?>> getDistricts(@PathVariable Integer provinceId) {
+        return ApiResponse.<List<?>>builder()
                 .code(StatusCode.SUCCESS.getCode())
-                .message("Lấy danh sách quận huyện thành công")
+                .message("Get districts successfully")
                 .result(ghnService.getDistricts(provinceId))
                 .build();
     }
 
     @GetMapping("/wards/{districtId}")
-    public ApiResponse<Object> getWards(@PathVariable Integer districtId) {
-        return ApiResponse.builder()
+    public ApiResponse<List<?>> getWards(@PathVariable Integer districtId) {
+        return ApiResponse.<List<?>>builder()
                 .code(StatusCode.SUCCESS.getCode())
-                .message("Lấy danh sách phường xã thành công")
+                .message("Get wards successfully")
                 .result(ghnService.getWards(districtId))
                 .build();
     }
 
     @GetMapping("/fee")
-    public ApiResponse<Object> calculateFee(
+    public ApiResponse<Long> calculateFee(
             @RequestParam Integer districtId,
             @RequestParam String wardCode,
             @RequestParam(defaultValue = "1000") Integer weight) {
-        return ApiResponse.builder()
+        return ApiResponse.<Long>builder()
                 .code(StatusCode.SUCCESS.getCode())
-                .message("Tính phí vận chuyển thành công")
+                .message("Calculate shipping fee successfully")
                 .result(ghnService.calculateFee(districtId, wardCode, weight))
                 .build();
     }

@@ -1,14 +1,17 @@
 package com.buixuantruong.shopapp.controller;
 
 import com.buixuantruong.shopapp.dto.response.ApiResponse;
+import com.buixuantruong.shopapp.dto.response.FlashSaleItemResponse;
+import com.buixuantruong.shopapp.dto.response.MessageResponse;
 import com.buixuantruong.shopapp.exception.StatusCode;
 import com.buixuantruong.shopapp.service.FlashSaleService;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/flash-sales")
@@ -19,8 +22,8 @@ public class FlashSaleController {
     FlashSaleService flashSaleService;
 
     @GetMapping("/active-items")
-    public ApiResponse<Object> getActiveFlashSaleItems() {
-        return ApiResponse.builder()
+    public ApiResponse<List<FlashSaleItemResponse>> getActiveFlashSaleItems() {
+        return ApiResponse.<List<FlashSaleItemResponse>>builder()
                 .code(StatusCode.SUCCESS.getCode())
                 .message(StatusCode.SUCCESS.getMessage())
                 .result(flashSaleService.getActiveFlashSaleItems())
@@ -28,8 +31,8 @@ public class FlashSaleController {
     }
 
     @GetMapping("/price/{variantId}")
-    public ApiResponse<Object> getFlashSalePrice(@PathVariable Long variantId) {
-        return ApiResponse.builder()
+    public ApiResponse<Double> getFlashSalePrice(@PathVariable Long variantId) {
+        return ApiResponse.<Double>builder()
                 .code(StatusCode.SUCCESS.getCode())
                 .message(StatusCode.SUCCESS.getMessage())
                 .result(flashSaleService.getFlashSalePrice(variantId))
@@ -37,23 +40,15 @@ public class FlashSaleController {
     }
 
     @PostMapping("/checkout")
-    public ResponseEntity<ApiResponse<Object>> applyFlashSaleWhenCheckout(
+    public ResponseEntity<ApiResponse<MessageResponse>> applyFlashSaleWhenCheckout(
             @RequestParam Long variantId,
             @RequestParam int quantity
     ) {
-        try {
-            flashSaleService.applyFlashSaleWhenCheckout(variantId, quantity);
-            return ResponseEntity.ok(ApiResponse.builder()
-                    .code(StatusCode.SUCCESS.getCode())
-                    .message(StatusCode.SUCCESS.getMessage())
-                    .result("Flash sale applied successfully")
-                    .build());
-        } catch (IllegalStateException | IllegalArgumentException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(ApiResponse.builder()
-                            .code(StatusCode.BAD_REQUEST.getCode())
-                            .message(e.getMessage())
-                            .build());
-        }
+        flashSaleService.applyFlashSaleWhenCheckout(variantId, quantity);
+        return ResponseEntity.ok(ApiResponse.<MessageResponse>builder()
+                .code(StatusCode.SUCCESS.getCode())
+                .message(StatusCode.SUCCESS.getMessage())
+                .result(MessageResponse.builder().message("Flash sale applied successfully").build())
+                .build());
     }
 }

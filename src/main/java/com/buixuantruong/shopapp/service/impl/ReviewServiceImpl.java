@@ -1,10 +1,13 @@
 package com.buixuantruong.shopapp.service.impl;
 
 import com.buixuantruong.shopapp.dto.ReviewDTO;
-import com.buixuantruong.shopapp.dto.response.ApiResponse;
+import com.buixuantruong.shopapp.dto.response.MessageResponse;
+import com.buixuantruong.shopapp.dto.response.ReviewPageResponse;
+import com.buixuantruong.shopapp.dto.response.ReviewRatingSummaryResponse;
 import com.buixuantruong.shopapp.dto.response.ReviewResponse;
-import com.buixuantruong.shopapp.exception.DataNotFoundException;
+import com.buixuantruong.shopapp.exception.AppException;
 import com.buixuantruong.shopapp.exception.StatusCode;
+import com.buixuantruong.shopapp.mapper.ReviewMapper;
 import com.buixuantruong.shopapp.model.Product;
 import com.buixuantruong.shopapp.model.Review;
 import com.buixuantruong.shopapp.model.User;
@@ -33,24 +36,20 @@ public class ReviewServiceImpl implements ReviewService {
     ReviewRepository reviewRepository;
     UserRepository userRepository;
     ProductRepository productRepository;
+    ReviewMapper reviewMapper;
 
     @Override
     @Transactional
-    public ApiResponse<Object> createReview(ReviewDTO reviewDTO) throws DataNotFoundException {
+    public ReviewResponse createReview(ReviewDTO reviewDTO) {
         User user = userRepository.findById(reviewDTO.getUserId())
-                .orElseThrow(() -> new DataNotFoundException("User not found with id: " + reviewDTO.getUserId()));
-
+                .orElseThrow(() -> new AppException(StatusCode.USER_NOT_FOUND));
         Product product = productRepository.findById(reviewDTO.getProductId())
-                .orElseThrow(() -> new DataNotFoundException("Product not found with id: " + reviewDTO.getProductId()));
+                .orElseThrow(() -> new AppException(StatusCode.PRODUCT_NOT_FOUND));
 
-        // Kiểm tra xem user đã review sản phẩm này chưa
         Optional<Review> existingReview = reviewRepository.findByUser_IdAndProduct_Id(
                 reviewDTO.getUserId(), reviewDTO.getProductId());
         if (existingReview.isPresent()) {
-            return ApiResponse.builder()
-                    .code(StatusCode.INVALID_DATA.getCode())
-                    .message("You have already reviewed this product")
-                    .build();
+            throw new AppException(StatusCode.REVIEW_ALREADY_EXISTS);
         }
 
         Review review = Review.builder()
@@ -60,55 +59,32 @@ public class ReviewServiceImpl implements ReviewService {
                 .rating(reviewDTO.getRating())
                 .build();
 
-        Review savedReview = reviewRepository.save(review);
-
-        return ApiResponse.builder()
-                .code(StatusCode.SUCCESS.getCode())
-                .message(StatusCode.SUCCESS.getMessage())
-                .result(ReviewResponse.fromReview(savedReview))
-                .build();
+        return reviewMapper.toResponse(reviewRepository.save(review));
     }
 
     @Override
-    public ApiResponse<Object> getReviewsByProduct(Long productId, Pageable pageable) {
+    public ReviewPageResponse getReviewsByProduct(Long productId, Pageable pageable) {
         Page<Review> reviewPage = reviewRepository.findByProduct_Id(productId, pageable);
-        List<ReviewResponse> reviewResponses = reviewPage.getContent().stream()
-                .map(ReviewResponse::fromReview)
-                .toList();
-
-        Map<String, Object> result = new HashMap<>();
-        result.put("reviews", reviewResponses);
-        result.put("totalPages", reviewPage.getTotalPages());
-        result.put("totalElements", reviewPage.getTotalElements());
-
-        return ApiResponse.builder()
-                .code(StatusCode.SUCCESS.getCode())
-                .message(StatusCode.SUCCESS.getMessage())
-                .result(result)
+        return ReviewPageResponse.builder()
+                .reviews(reviewPage.getContent().stream().map(reviewMapper::toResponse).toList())
+                .totalPages(reviewPage.getTotalPages())
+                .totalElements(reviewPage.getTotalElements())
                 .build();
     }
 
     @Override
-    public ApiResponse<Object> getReviewsByUser(Long userId) {
-        List<Review> reviews = reviewRepository.findByUser_Id(userId);
-        List<ReviewResponse> reviewResponses = reviews.stream()
-                .map(ReviewResponse::fromReview)
+    public List<ReviewResponse> getReviewsByUser(Long userId) {
+        return reviewRepository.findByUser_Id(userId).stream()
+                .map(reviewMapper::toResponse)
                 .toList();
-
-        return ApiResponse.builder()
-                .code(StatusCode.SUCCESS.getCode())
-                .message(StatusCode.SUCCESS.getMessage())
-                .result(reviewResponses)
-                .build();
     }
 
     @Override
     @Transactional
-    public ApiResponse<Object> updateReview(Long reviewId, ReviewDTO reviewDTO) throws DataNotFoundException {
+    public ReviewResponse updateReview(Long reviewId, ReviewDTO reviewDTO) {
         Review review = reviewRepository.findById(reviewId)
-                .orElseThrow(() -> new DataNotFoundException("Review not found with id: " + reviewId));
+                .orElseThrow(() -> new AppException(StatusCode.REVIEW_NOT_FOUND));
 
-        // Chỉ cho phép sửa comment và rating
         if (reviewDTO.getComment() != null) {
             review.setComment(reviewDTO.getComment());
         }
@@ -116,70 +92,45 @@ public class ReviewServiceImpl implements ReviewService {
             review.setRating(reviewDTO.getRating());
         }
 
-        Review updatedReview = reviewRepository.save(review);
-
-        return ApiResponse.builder()
-                .code(StatusCode.SUCCESS.getCode())
-                .message(StatusCode.SUCCESS.getMessage())
-                .result(ReviewResponse.fromReview(updatedReview))
-                .build();
+        return reviewMapper.toResponse(reviewRepository.save(review));
     }
 
     @Override
     @Transactional
-    public ApiResponse<Object> deleteReview(Long reviewId) throws DataNotFoundException {
+    public MessageResponse deleteReview(Long reviewId) {
         Review review = reviewRepository.findById(reviewId)
-                .orElseThrow(() -> new DataNotFoundException("Review not found with id: " + reviewId));
-
+                .orElseThrow(() -> new AppException(StatusCode.REVIEW_NOT_FOUND));
         reviewRepository.delete(review);
-
-        return ApiResponse.builder()
-                .code(StatusCode.SUCCESS.getCode())
-                .message(StatusCode.SUCCESS.getMessage())
-                .result("Review deleted successfully")
-                .build();
+        return MessageResponse.builder().message("Review deleted successfully").build();
     }
 
     @Override
     @Transactional
-    public ApiResponse<Object> respondToReview(Long reviewId, String response) throws DataNotFoundException {
+    public ReviewResponse respondToReview(Long reviewId, String response) {
         Review review = reviewRepository.findById(reviewId)
-                .orElseThrow(() -> new DataNotFoundException("Review not found with id: " + reviewId));
-
+                .orElseThrow(() -> new AppException(StatusCode.REVIEW_NOT_FOUND));
         review.setAdminResponse(response);
-        Review updatedReview = reviewRepository.save(review);
-
-        return ApiResponse.builder()
-                .code(StatusCode.SUCCESS.getCode())
-                .message(StatusCode.SUCCESS.getMessage())
-                .result(ReviewResponse.fromReview(updatedReview))
-                .build();
+        return reviewMapper.toResponse(reviewRepository.save(review));
     }
 
     @Override
-    public ApiResponse<Object> getProductRatingSummary(Long productId) {
+    public ReviewRatingSummaryResponse getProductRatingSummary(Long productId) {
         Double averageRating = reviewRepository.findAverageRatingByProductId(productId);
         List<Object[]> ratingCounts = reviewRepository.countReviewsByRatingForProduct(productId);
 
-        Map<String, Object> summary = new HashMap<>();
-        summary.put("averageRating", averageRating != null ? Math.round(averageRating * 10.0) / 10.0 : 0.0);
-
         Map<Integer, Long> ratingDistribution = new HashMap<>();
-        for (int i = 1; i <= 5; i++) ratingDistribution.put(i, 0L);
-        for (Object[] row : ratingCounts) {
-            Integer star = (Integer) row[0];
-            Long count = (Long) row[1];
-            ratingDistribution.put(star, count);
+        for (int i = 1; i <= 5; i++) {
+            ratingDistribution.put(i, 0L);
         }
-        summary.put("ratingDistribution", ratingDistribution);
+        for (Object[] row : ratingCounts) {
+            ratingDistribution.put((Integer) row[0], (Long) row[1]);
+        }
 
         long totalReviews = ratingDistribution.values().stream().mapToLong(Long::longValue).sum();
-        summary.put("totalReviews", totalReviews);
-
-        return ApiResponse.builder()
-                .code(StatusCode.SUCCESS.getCode())
-                .message(StatusCode.SUCCESS.getMessage())
-                .result(summary)
+        return ReviewRatingSummaryResponse.builder()
+                .averageRating(averageRating != null ? Math.round(averageRating * 10.0) / 10.0 : 0.0)
+                .ratingDistribution(ratingDistribution)
+                .totalReviews(totalReviews)
                 .build();
     }
 }

@@ -33,6 +33,7 @@ public class OrderDTO {
     String shippingMethod;
     String shippingAddress;
     String paymentMethod;
+    Boolean paymentSuccess;
     LocalDate shippingDate;
     List<CartItemDTO> cartItems;
     Integer provinceId;

@@ -34,7 +34,7 @@ public class Variant extends BaseEntity {
 
     private String storage;
 
-    private String ram;
+    //private String ram;
 
     private String imageUrl;
 

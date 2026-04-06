@@ -8,17 +8,18 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
+import java.time.LocalDateTime;
 
 public interface ProductRepository extends JpaRepository<Product, Long> {
     boolean existsByName(String name);
-    boolean existsByWarrantyCode(String warrantyCode);
+
     Page<Product> findAll(Pageable pageable);
 
-    @Query("SELECT p FROM Product p WHERE p.id IN :productIds")
+    @Query("SELECT DISTINCT p FROM Product p WHERE p.id IN :productIds")
     List<Product> findProductByIds(@Param("productIds") List<Long> productIds);
 
     @Query("""
-            SELECT p FROM Product p
+            SELECT DISTINCT p FROM Product p
             WHERE p.id IN :productIds
               AND EXISTS (
                   SELECT 1 FROM Variant v
@@ -29,15 +30,15 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     List<Product> findActiveProductsByIds(@Param("productIds") List<Long> productIds);
 
     @Query("""
-            SELECT p FROM Product p
+            SELECT DISTINCT p FROM Product p
             WHERE p.id <> :productId
               AND p.category.id = :categoryId
-              AND (:minPrice IS NULL OR p.price >= :minPrice)
-              AND (:maxPrice IS NULL OR p.price <= :maxPrice)
               AND EXISTS (
                   SELECT 1 FROM Variant v
                   WHERE v.product = p
                     AND v.isActive = true
+                    AND (:minPrice IS NULL OR v.price >= :minPrice)
+                    AND (:maxPrice IS NULL OR v.price <= :maxPrice)
               )
             """)
     List<Product> findSimilarCandidates(
@@ -46,15 +47,36 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
             @Param("minPrice") Float minPrice,
             @Param("maxPrice") Float maxPrice
     );
-    
-    // Find products by category ID
+
     Page<Product> findByCategoryId(Long categoryId, Pageable pageable);
 
-    @Query("SELECT p FROM Product p WHERE " +
-            "(:categoryId IS NULL OR p.category.id = :categoryId) " +
-            "AND (:keyword IS NULL OR :keyword = '' OR p.name LIKE %:keyword% OR p.description LIKE %:keyword%) " +
-            "AND (:minPrice IS NULL OR p.price >= :minPrice) " +
-            "AND (:maxPrice IS NULL OR p.price <= :maxPrice)")
+    @Query("""
+            SELECT DISTINCT p FROM Product p
+            WHERE p.createAt >= :fromDate
+              AND EXISTS (
+                  SELECT 1 FROM Variant v
+                  WHERE v.product = p
+                    AND v.isActive = true
+              )
+            """)
+    Page<Product> findNewProducts(@Param("fromDate") LocalDateTime fromDate, Pageable pageable);
+
+    @Query("""
+            SELECT DISTINCT p FROM Product p
+            LEFT JOIN p.variants v
+            WHERE (:categoryId IS NULL OR p.category.id = :categoryId)
+              AND (:keyword IS NULL OR :keyword = '' OR LOWER(p.name) LIKE LOWER(CONCAT('%', :keyword, '%')) OR LOWER(p.description) LIKE LOWER(CONCAT('%', :keyword, '%')))
+              AND (:minPrice IS NULL OR EXISTS (
+                    SELECT 1 FROM Variant vMin
+                    WHERE vMin.product = p
+                      AND vMin.price >= :minPrice
+              ))
+              AND (:maxPrice IS NULL OR EXISTS (
+                    SELECT 1 FROM Variant vMax
+                    WHERE vMax.product = p
+                      AND vMax.price <= :maxPrice
+              ))
+            """)
     Page<Product> searchProducts(
             @Param("categoryId") Long categoryId,
             @Param("keyword") String keyword,
@@ -62,8 +84,12 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
             @Param("maxPrice") Float maxPrice,
             Pageable pageable);
 
-    @Query("SELECT p FROM Product p WHERE p.thumbnail LIKE %:keyword%")
-    List<Product> findByThumbnailContaining(@Param("keyword") String keyword);
+    @Query("""
+            SELECT DISTINCT p FROM Product p
+            JOIN p.variants v
+            WHERE v.imageUrl LIKE %:keyword%
+            """)
+    List<Product> findByVariantImageContaining(@Param("keyword") String keyword);
 
     void deleteAll(Iterable<? extends Product> products);
 }

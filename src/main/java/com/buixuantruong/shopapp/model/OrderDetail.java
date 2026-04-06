@@ -22,8 +22,8 @@ public class OrderDetail {
     private Order order;
 
     @ManyToOne
-    @JoinColumn(name = "product_id")
-    private Product product;
+    @JoinColumn(name = "variant_id")
+    private Variant variant;
 
     @Column(name = "price", nullable = false)
     private Float price;

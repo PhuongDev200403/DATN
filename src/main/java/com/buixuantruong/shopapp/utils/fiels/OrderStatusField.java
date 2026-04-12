@@ -4,6 +4,7 @@ package com.buixuantruong.shopapp.utils.fiels;
 public class OrderStatusField {
     public static final String PENDING = "PENDING";
     public static final String PAID = "PAID";
+    public static final String FAILED = "FAILED";
     public static final String CONFIRMED = "CONFIRMED";
     public static final String PROCESSING = "PROCESSING";
     public static final String SHIPPED = "SHIPPED";

@@ -7,8 +7,8 @@ import jakarta.validation.constraints.Size;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.util.Date;
 import java.util.List;
 
 @Data
@@ -29,11 +29,12 @@ public class OrderDTO {
     String note;
     String status;
     @Min(value = 0, message = "total money must be > 0")
-    Long totalMoney;
+    BigDecimal totalMoney;
     String shippingMethod;
     String shippingAddress;
     String paymentMethod;
     Boolean paymentSuccess;
+    String couponCode;
     LocalDate shippingDate;
     List<CartItemDTO> cartItems;
     Integer provinceId;

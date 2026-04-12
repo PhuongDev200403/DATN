@@ -8,6 +8,7 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.NoHandlerFoundException;
 
 @Slf4j
 @RestControllerAdvice
@@ -19,7 +20,7 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(statusCode.getHttpStatusCode())
                 .body(ApiResponse.<Void>builder()
                         .code(statusCode.getCode())
-                        .message(statusCode.getMessage())
+                        .message(exception.getMessage() != null ? exception.getMessage() : statusCode.getMessage())
                         .build());
     }
 
@@ -55,6 +56,15 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.<Void>builder()
                         .code(StatusCode.UNAUTHORIZED.getCode())
                         .message(StatusCode.UNAUTHORIZED.getMessage())
+                        .build());
+    }
+
+    @ExceptionHandler(NoHandlerFoundException.class)
+    ResponseEntity<ApiResponse<Void>> handleNoHandlerFoundException(NoHandlerFoundException exception) {
+        return ResponseEntity.status(StatusCode.RESOURCE_NOT_FOUND.getHttpStatusCode())
+                .body(ApiResponse.<Void>builder()
+                        .code(StatusCode.RESOURCE_NOT_FOUND.getCode())
+                        .message(StatusCode.RESOURCE_NOT_FOUND.getMessage())
                         .build());
     }
 

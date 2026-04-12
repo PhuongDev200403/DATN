@@ -1,19 +1,20 @@
 package com.buixuantruong.shopapp.dto.response;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
-import jakarta.persistence.Column;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
-import lombok.experimental.SuperBuilder;
 
 import java.time.LocalDateTime;
 
 @Data
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@SuperBuilder
 @FieldDefaults(level = AccessLevel.PRIVATE)
-public class BaseResponse {
-    LocalDateTime createAt;
-    LocalDateTime updatedAt;
+public class WarrantyCheckResponse {
+    String serialNumber;
+    Long variantId;
+    Long orderId;
+    LocalDateTime warrantyExpiredAt;
+    boolean inWarranty;
+    String status;
 }

@@ -27,5 +27,7 @@ public interface ProductMapper {
     void updateProductFromDto(ProductDTO dto, @MappingTarget Product product);
 
     @Mapping(target = "categoryId", source = "category.id")
+    @Mapping(target = "createAt", source = "createAt")
+    @Mapping(target = "updatedAt", source = "updatedAt")
     ProductResponse toResponse(Product product);
 }

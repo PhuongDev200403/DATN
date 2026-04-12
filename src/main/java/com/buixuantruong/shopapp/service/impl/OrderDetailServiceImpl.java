@@ -16,6 +16,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 @Service
@@ -36,8 +37,8 @@ public class OrderDetailServiceImpl implements OrderDetailService {
                 .order(order)
                 .variant(variant)
                 .numberOfProducts(orderDetailDTO.getNumberOfProducts())
-                .price(orderDetailDTO.getPrice())
-                .totalMoney(orderDetailDTO.getTotalMoney())
+                .price(defaultMoney(orderDetailDTO.getPrice()))
+                .totalMoney(defaultMoney(orderDetailDTO.getTotalMoney()))
                 .color(orderDetailDTO.getColor())
                 .build();
 
@@ -61,8 +62,8 @@ public class OrderDetailServiceImpl implements OrderDetailService {
         existingOrderDetail.setOrder(existingOrder);
         existingOrderDetail.setVariant(existingVariant);
         existingOrderDetail.setNumberOfProducts(orderDetailDTO.getNumberOfProducts());
-        existingOrderDetail.setPrice(orderDetailDTO.getPrice());
-        existingOrderDetail.setTotalMoney(orderDetailDTO.getTotalMoney());
+        existingOrderDetail.setPrice(defaultMoney(orderDetailDTO.getPrice()));
+        existingOrderDetail.setTotalMoney(defaultMoney(orderDetailDTO.getTotalMoney()));
         existingOrderDetail.setColor(orderDetailDTO.getColor());
         return orderDetailRepository.save(existingOrderDetail);
     }
@@ -76,5 +77,9 @@ public class OrderDetailServiceImpl implements OrderDetailService {
     @Override
     public List<OrderDetail> getOrderDetailByOrderId(Long orderId) {
         return orderDetailRepository.findByOrderId(orderId);
+    }
+
+    private BigDecimal defaultMoney(BigDecimal value) {
+        return value == null ? BigDecimal.ZERO : value;
     }
 }

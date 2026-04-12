@@ -4,15 +4,12 @@ import com.buixuantruong.shopapp.dto.CategoryDTO;
 import com.buixuantruong.shopapp.dto.response.ApiResponse;
 import com.buixuantruong.shopapp.dto.response.CategoryResponse;
 import com.buixuantruong.shopapp.dto.response.MessageResponse;
-import com.buixuantruong.shopapp.exception.AppException;
 import com.buixuantruong.shopapp.exception.StatusCode;
 import com.buixuantruong.shopapp.service.CategoryService;
 import jakarta.validation.Valid;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
-import org.springframework.validation.BindingResult;
-import org.springframework.validation.FieldError;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -26,11 +23,7 @@ public class CategoryController {
     CategoryService categoryService;
 
     @PostMapping("")
-    public ApiResponse<CategoryResponse> createCategory(@Valid @RequestBody CategoryDTO categoryDTO, BindingResult bindingResult) {
-        if (bindingResult.hasErrors()) {
-            List<String> errorMessage = bindingResult.getFieldErrors().stream().map(FieldError::getDefaultMessage).toList();
-            throw new AppException(StatusCode.VALIDATION_ERROR);
-        }
+    public ApiResponse<CategoryResponse> createCategory(@Valid @RequestBody CategoryDTO categoryDTO) {
         return ApiResponse.<CategoryResponse>builder()
                 .code(StatusCode.SUCCESS.getCode())
                 .message(StatusCode.SUCCESS.getMessage())

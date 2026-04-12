@@ -2,6 +2,7 @@ package com.buixuantruong.shopapp.dto.response;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Date;
 import java.util.List;
@@ -22,13 +23,15 @@ public class OrderResponse {
     String note;
     Date orderDate;
     String status;
-    Long totalMoney;
+    BigDecimal totalMoney;
     String shippingMethod;
     String shippingAddress;
     LocalDate shippingDate;
     String paymentMethod;
     String paymentStatus;
-    Long shippingFee;
+    String couponCode;
+    BigDecimal discountAmount;
+    BigDecimal shippingFee;
     Integer provinceId;
     Integer districtId;
     String wardCode;

@@ -50,11 +50,10 @@ public class JWTTokenFilter extends OncePerRequestFilter {
                     }
                 }
             }
-
-            filterChain.doFilter(request, response);
         } catch (Exception e) {
             SecurityContextHolder.clearContext();
-            response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Unauthorized");
         }
+
+        filterChain.doFilter(request, response);
     }
 }

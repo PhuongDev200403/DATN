@@ -14,12 +14,14 @@ public interface VariantMapper {
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "product", ignore = true)
     @Mapping(target = "specification", ignore = true)
+    @Mapping(target = "imageUrl", ignore = true)
     Variant toVariant(VariantDTO dto);
 
     @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "product", ignore = true)
     @Mapping(target = "specification", ignore = true)
+    @Mapping(target = "imageUrl", ignore = true)
     void updateVariantFromDto(VariantDTO dto, @MappingTarget Variant variant);
 
     @Mapping(target = "productId", source = "product.id")

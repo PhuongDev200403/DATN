@@ -23,18 +23,18 @@ public class SupportAiService {
     UserRepository userRepository;
 
     private static final String SHOP_POLICIES = """
-            - Chính sách đổi trả: Trong vòng 7 ngày nếu có lỗi từ nhà sản xuất.
-            - Phí vận chuyển: Nội thành Hà Nội 20k, tỉnh khác 30-50k. Miễn phí đơn trên 1 triệu.
-            - Thời gian giao hàng: 1-3 ngày làm việc.
-            - Bảo hành: Theo chính sách của từng hãng, tối thiểu 6 tháng.
-            - Địa chỉ cửa hàng: Số 298 đường Cầu Diễn, Bắc Từ Liêm, Hà Nội.
-            - Hotline: 1900-1234 (8:00 - 22:00 hàng ngày).
+            - ChÃ­nh sÃ¡ch Ä‘á»•i tráº£: Trong vÃ²ng 7 ngÃ y náº¿u cÃ³ lá»—i tá»« nhÃ  sáº£n xuáº¥t.
+            - PhÃ­ váº­n chuyá»ƒn: Ná»™i thÃ nh HÃ  Ná»™i 20k, tá»‰nh khÃ¡c 30-50k. Miá»…n phÃ­ Ä‘Æ¡n trÃªn 1 triá»‡u.
+            - Thá»i gian giao hÃ ng: 1-3 ngÃ y lÃ m viá»‡c.
+            - Báº£o hÃ nh: Theo chÃ­nh sÃ¡ch cá»§a tá»«ng hÃ£ng, tá»‘i thiá»ƒu 6 thÃ¡ng.
+            - Äá»‹a chá»‰ cá»­a hÃ ng: Sá»‘ 298 Ä‘Æ°á»ng Cáº§u Diá»…n, Báº¯c Tá»« LiÃªm, HÃ  Ná»™i.
+            - Hotline: 1900-1234 (8:00 - 22:00 hÃ ng ngÃ y).
             """;
 
     @Cacheable(value = "support_chats", key = "T(java.util.Objects).hash(#query, T(org.springframework.security.core.context.SecurityContextHolder).getContext().getAuthentication()?.name)")
     public String chatWithSupport(String query) {
         var authentication = SecurityContextHolder.getContext().getAuthentication();
-        String contextContent = "CHÍNH SÁCH CỬA HÀNG:\n" + SHOP_POLICIES;
+        String contextContent = "CHÃNH SÃCH Cá»¬A HÃ€NG:\n" + SHOP_POLICIES;
 
         if (authentication != null && authentication.isAuthenticated() && !authentication.getName().equals("anonymousUser")) {
             String authName = authentication.getName();
@@ -45,14 +45,19 @@ public class SupportAiService {
                     if (!orders.isEmpty()) {
                         String orderHistory = orders.stream()
                                 .limit(5)
-                                .map(o -> String.format("- Đơn #%d: Trạng thái %s, Tổng tiền %,d VNĐ, Ngày đặt %s",
-                                        o.getId(), o.getStatus(), o.getTotalMoney(), o.getOrderDate()))
+                                .map(order -> String.format(
+                                        "- ÄÆ¡n #%d: Tráº¡ng thÃ¡i %s, Tá»•ng tiá»n %s VNÄ, NgÃ y Ä‘áº·t %s",
+                                        order.getId(),
+                                        order.getStatus(),
+                                        order.getTotalMoney(),
+                                        order.getOrderDate()
+                                ))
                                 .collect(Collectors.joining("\n"));
-                        contextContent += "\n\nLỊCH SỬ ĐƠN HÀNG CỦA NGƯỜI DÙNG:\n" + orderHistory;
+                        contextContent += "\n\nLá»ŠCH Sá»¬ ÄÆ N HÃ€NG Cá»¦A NGÆ¯á»œI DÃ™NG:\n" + orderHistory;
                     }
                 }
-            } catch (Exception e) {
-                // Unauthenticated or user not found, continue with basic shop policies
+            } catch (Exception ignored) {
+                // Continue with basic shop policies when user context is unavailable.
             }
         }
 

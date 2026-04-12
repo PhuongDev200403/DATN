@@ -43,7 +43,7 @@ public class FlashSaleServiceImpl implements FlashSaleService {
 
         Variant variant = variantRepository.findById(variantId)
                 .orElseThrow(() -> new AppException(StatusCode.VARIANT_NOT_FOUND));
-        return variant.getPrice();
+        return variant.getPrice() == null ? 0D : variant.getPrice().doubleValue();
     }
 
     @Override
@@ -72,6 +72,27 @@ public class FlashSaleServiceImpl implements FlashSaleService {
 
         // Lock + transactional update to prevent oversell when multiple checkouts happen concurrently.
         flashSaleItem.setQuantitySold(quantitySold + quantity);
+        flashSaleItemRepository.save(flashSaleItem);
+    }
+
+    @Override
+    @Transactional
+    public void releaseFlashSaleReservation(Long variantId, int quantity) {
+        if (quantity <= 0) {
+            return;
+        }
+
+        List<FlashSaleItem> lockedItems = flashSaleItemRepository.lockValidFlashSaleItemsByVariantId(
+                variantId,
+                LocalDateTime.now()
+        );
+        if (lockedItems.isEmpty()) {
+            return;
+        }
+
+        FlashSaleItem flashSaleItem = lockedItems.getFirst();
+        int quantitySold = flashSaleItem.getQuantitySold() != null ? flashSaleItem.getQuantitySold() : 0;
+        flashSaleItem.setQuantitySold(Math.max(0, quantitySold - quantity));
         flashSaleItemRepository.save(flashSaleItem);
     }
 

@@ -42,13 +42,6 @@ public class UserServiceImpl implements UserService {
         if (userRepository.existsByPhoneNumber(phoneNumber)) {
             throw new AppException(StatusCode.USER_EXISTED);
         }
-        Role role = userDTO.getRole();
-        if (role == null) {
-            throw new AppException(StatusCode.ROLE_NOT_FOUND);
-        }
-        if (role == Role.ADMIN) {
-            throw new AppException(StatusCode.ADMIN_ROLE_NOT_ALLOWED);
-        }
         User newUser = User.builder()
                 .fullName(userDTO.getFullName())
                 .phoneNumber(userDTO.getPhoneNumber())
@@ -56,9 +49,9 @@ public class UserServiceImpl implements UserService {
                 .dateOfBirth(userDTO.getDateOfBirth())
                 .email(userDTO.getEmail())
                 .avatarUrl(userDTO.getAvatarUrl())
+                .role(Role.USER)
                 .socialAccounts(new ArrayList<>())
                 .build();
-        newUser.setRole(role);
 
         boolean isSocialLogin = userDTO.getSocialProvider() != null && userDTO.getSocialProviderId() != null;
         if (!isSocialLogin) {

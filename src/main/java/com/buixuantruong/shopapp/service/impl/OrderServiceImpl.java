@@ -8,28 +8,35 @@ import com.buixuantruong.shopapp.exception.StatusCode;
 import com.buixuantruong.shopapp.mapper.OrderMapper;
 import com.buixuantruong.shopapp.model.Cart;
 import com.buixuantruong.shopapp.model.CartItem;
+import com.buixuantruong.shopapp.model.Coupon;
+import com.buixuantruong.shopapp.model.CouponType;
 import com.buixuantruong.shopapp.model.Order;
 import com.buixuantruong.shopapp.model.OrderDetail;
 import com.buixuantruong.shopapp.model.Specification;
 import com.buixuantruong.shopapp.model.User;
 import com.buixuantruong.shopapp.model.Variant;
 import com.buixuantruong.shopapp.repository.CartRepository;
+import com.buixuantruong.shopapp.repository.CouponRepository;
 import com.buixuantruong.shopapp.repository.OrderDetailRepository;
 import com.buixuantruong.shopapp.repository.OrderRepository;
 import com.buixuantruong.shopapp.repository.UserRepository;
 import com.buixuantruong.shopapp.repository.VariantRepository;
 import com.buixuantruong.shopapp.service.CartService;
+import com.buixuantruong.shopapp.service.FlashSaleService;
 import com.buixuantruong.shopapp.service.GHNService;
 import com.buixuantruong.shopapp.service.OrderService;
+import com.buixuantruong.shopapp.service.ProductUnitService;
 import com.buixuantruong.shopapp.utils.fiels.OrderStatusField;
-import jakarta.transaction.Transactional;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -42,14 +49,19 @@ import java.util.Optional;
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class OrderServiceImpl implements OrderService {
 
+    BigDecimal ZERO = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+
     UserRepository userRepository;
     OrderRepository orderRepository;
     OrderMapper orderMapper;
     OrderDetailRepository orderDetailRepository;
     VariantRepository variantRepository;
     CartRepository cartRepository;
+    CouponRepository couponRepository;
     GHNService ghnService;
     CartService cartService;
+    FlashSaleService flashSaleService;
+    ProductUnitService productUnitService;
 
     @Override
     @Transactional
@@ -64,28 +76,63 @@ public class OrderServiceImpl implements OrderService {
             throw new AppException(StatusCode.CART_ITEMS_EMPTY);
         }
 
+        List<CheckoutItem> checkoutItems = lockAndPrepareCartItems(cartItems);
+        BigDecimal subTotal = calculateSubTotal(checkoutItems);
+        BigDecimal shippingFee = calculateShippingFee(orderDTO, checkoutItems);
+        CouponApplication couponApplication = applyCouponIfPresent(orderDTO.getCouponCode(), subTotal);
+        BigDecimal totalMoney = subTotal.subtract(couponApplication.discountAmount()).add(shippingFee)
+                .max(ZERO)
+                .setScale(2, RoundingMode.HALF_UP);
+
+        reserveInventory(checkoutItems);
+        reserveFlashSaleQuota(checkoutItems);
+
         Order order = buildPendingOrder(orderDTO, user);
-        List<ValidatedCartItem> validatedCartItems = validateCartItems(cartItems);
-
-        long subTotal = validatedCartItems.stream()
-                .mapToLong(item -> Math.round(item.unitPrice() * item.quantity()))
-                .sum();
-
-        Long shippingFee = calculateShippingFee(orderDTO, validatedCartItems);
+        order.setCouponCode(couponApplication.couponCode());
+        order.setDiscountAmount(couponApplication.discountAmount());
         order.setShippingFee(shippingFee);
-        order.setTotalMoney(subTotal + shippingFee);
+        order.setTotalMoney(totalMoney);
+        updateOrderStatusAfterCheckout(order, orderDTO);
 
         Order savedOrder = orderRepository.save(order);
-        List<OrderDetail> orderDetails = createOrderDetails(savedOrder, validatedCartItems);
+        List<OrderDetail> orderDetails = createOrderDetails(savedOrder, checkoutItems);
         savedOrder.setOrderDetails(orderDetails);
-
-        applyPaymentSimulation(savedOrder, orderDTO);
-        if (shouldDecreaseStock(savedOrder)) {
-            decrementStock(validatedCartItems);
+        productUnitService.reserveUnits(savedOrder.getId());
+        if (isPaymentCompletedAtCheckout(savedOrder, orderDTO)) {
+            productUnitService.confirmUnitsSold(savedOrder.getId());
         }
 
         cartService.clearCart(user.getId());
         return orderMapper.toResponse(orderRepository.save(savedOrder));
+    }
+
+    @Override
+    @Transactional
+    public void finalizeOnlinePayment(Long orderId, boolean paymentSuccessful) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new AppException(StatusCode.ORDER_NOT_FOUND));
+
+        if (OrderStatusField.CONFIRMED.equals(order.getStatus())
+                || OrderStatusField.PAID.equals(order.getStatus())
+                || OrderStatusField.FAILED.equals(order.getStatus())) {
+            return;
+        }
+
+        if (paymentSuccessful) {
+            productUnitService.confirmUnitsSold(order.getId());
+            order.setStatus(OrderStatusField.PAID);
+            order.setPaymentStatus(OrderStatusField.PAID);
+            order.setPaymentDate(LocalDateTime.now().toString());
+            orderRepository.save(order);
+            return;
+        }
+
+        productUnitService.releaseUnits(order.getId());
+        releaseReservedInventory(order);
+        releaseCouponUsage(order.getCouponCode());
+        order.setStatus(OrderStatusField.FAILED);
+        order.setPaymentStatus(OrderStatusField.FAILED);
+        orderRepository.save(order);
     }
 
     @Override
@@ -150,7 +197,7 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
-    @Transactional
+    @Transactional(readOnly = true)
     public Page<OrderResponse> getAllUserOrders(PageRequest pageRequest) {
         return orderRepository.findAll(pageRequest).map(orderMapper::toResponse);
     }
@@ -161,6 +208,7 @@ public class OrderServiceImpl implements OrderService {
         order.setOrderDate(new Date());
         order.setStatus(OrderStatusField.PENDING);
         order.setPaymentStatus(OrderStatusField.PENDING);
+        order.setDiscountAmount(ZERO);
         order.setActive(true);
         order.setPaymentMethod(normalizePaymentMethod(orderDTO.getPaymentMethod()));
 
@@ -172,84 +220,111 @@ public class OrderServiceImpl implements OrderService {
         return order;
     }
 
-    private List<ValidatedCartItem> validateCartItems(List<CartItem> cartItems) {
-        List<ValidatedCartItem> validatedItems = new ArrayList<>();
+    private List<CheckoutItem> lockAndPrepareCartItems(List<CartItem> cartItems) {
+        List<CheckoutItem> checkoutItems = new ArrayList<>();
         for (CartItem cartItem : cartItems) {
             if (cartItem.getVariant() == null || cartItem.getVariant().getId() == null) {
                 throw new AppException(StatusCode.VARIANT_NOT_FOUND);
             }
-            Variant variant = variantRepository.findById(cartItem.getVariant().getId())
+
+            Variant variant = variantRepository.findByIdForUpdate(cartItem.getVariant().getId())
                     .orElseThrow(() -> new AppException(StatusCode.VARIANT_NOT_FOUND));
+
             if (Boolean.FALSE.equals(variant.getIsActive())) {
                 throw new AppException(StatusCode.INVALID_DATA);
             }
+
             int quantity = cartItem.getQuantity() == null ? 0 : cartItem.getQuantity();
             if (quantity <= 0) {
                 throw new AppException(StatusCode.INVALID_QUANTITY);
             }
+
             long stock = variant.getStock() == null ? 0L : variant.getStock();
             if (stock < quantity) {
                 throw new AppException(StatusCode.INVALID_QUANTITY);
             }
 
-            float latestPrice = resolveLatestPrice(variant);
-            validatedItems.add(new ValidatedCartItem(variant, quantity, latestPrice));
+            checkoutItems.add(new CheckoutItem(
+                    variant,
+                    quantity,
+                    resolveCurrentUnitPrice(variant)
+            ));
         }
-        return validatedItems;
+        return checkoutItems;
     }
 
-    private Long calculateShippingFee(OrderDTO orderDTO, List<ValidatedCartItem> items) {
+    private BigDecimal calculateSubTotal(List<CheckoutItem> items) {
+        return items.stream()
+                .map(item -> item.unitPrice().multiply(BigDecimal.valueOf(item.quantity())))
+                .reduce(ZERO, BigDecimal::add)
+                .setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private BigDecimal calculateShippingFee(OrderDTO orderDTO, List<CheckoutItem> items) {
         if (orderDTO.getDistrictId() == null || orderDTO.getWardCode() == null) {
-            return 0L;
+            return ZERO;
         }
 
         int totalWeight = items.stream()
                 .mapToInt(item -> resolveVariantWeight(item.variant()) * item.quantity())
                 .sum();
 
-        return ghnService.calculateFee(orderDTO.getDistrictId(), orderDTO.getWardCode(), totalWeight);
+        return BigDecimal.valueOf(ghnService.calculateFee(orderDTO.getDistrictId(), orderDTO.getWardCode(), totalWeight))
+                .setScale(2, RoundingMode.HALF_UP);
     }
 
-    private List<OrderDetail> createOrderDetails(Order order, List<ValidatedCartItem> validatedItems) {
-        return validatedItems.stream()
-                .map(item -> orderDetailRepository.save(OrderDetail.builder()
-                        .order(order)
-                        .variant(item.variant())
-                        .numberOfProducts(item.quantity())
-                        .price(item.unitPrice())
-                        .totalMoney((long) Math.round(item.unitPrice() * item.quantity()))
-                        .color(item.variant().getColor())
-                        .build()))
-                .map(OrderDetail.class::cast)
-                .toList();
-    }
-
-    private void applyPaymentSimulation(Order order, OrderDTO orderDTO) {
-        boolean cod = "COD".equalsIgnoreCase(normalizePaymentMethod(orderDTO.getPaymentMethod()));
-        if (cod) {
-            order.setStatus(OrderStatusField.CONFIRMED);
-            order.setPaymentStatus(OrderStatusField.CONFIRMED);
-            return;
+    private CouponApplication applyCouponIfPresent(String couponCode, BigDecimal subTotal) {
+        if (couponCode == null || couponCode.isBlank()) {
+            return new CouponApplication(null, ZERO);
         }
 
-        if (Boolean.TRUE.equals(orderDTO.getPaymentSuccess())) {
-            order.setStatus(OrderStatusField.PAID);
-            order.setPaymentStatus(OrderStatusField.PAID);
-            order.setPaymentDate(LocalDateTime.now().toString());
-            return;
+        Coupon coupon = couponRepository.findByCodeForUpdate(couponCode.trim().toUpperCase())
+                .orElseThrow(() -> new AppException(StatusCode.COUPON_NOT_FOUND));
+
+        validateCoupon(coupon, subTotal);
+        BigDecimal discountAmount = calculateCouponDiscount(coupon, subTotal);
+        int usedCount = coupon.getUsedCount() == null ? 0 : coupon.getUsedCount();
+        coupon.setUsedCount(usedCount + 1);
+        couponRepository.save(coupon);
+        return new CouponApplication(coupon.getCode(), discountAmount);
+    }
+
+    private void validateCoupon(Coupon coupon, BigDecimal subTotal) {
+        if (!coupon.isActive()) {
+            throw new AppException(StatusCode.INVALID_COUPON);
         }
 
-        order.setStatus(OrderStatusField.PENDING);
-        order.setPaymentStatus("FAILED");
+        LocalDateTime now = LocalDateTime.now();
+        if ((coupon.getStartAt() != null && now.isBefore(coupon.getStartAt()))
+                || (coupon.getEndAt() != null && now.isAfter(coupon.getEndAt()))) {
+            throw new AppException(StatusCode.COUPON_NOT_AVAILABLE);
+        }
+
+        if (coupon.getUsedCount() != null
+                && coupon.getUsageLimit() != null
+                && coupon.getUsedCount() >= coupon.getUsageLimit()) {
+            throw new AppException(StatusCode.COUPON_USAGE_LIMIT_EXCEEDED);
+        }
+
+        if (coupon.getMinimumAmount() != null && subTotal.compareTo(coupon.getMinimumAmount()) < 0) {
+            throw new AppException(StatusCode.ORDER_AMOUNT_BELOW_MINIMUM);
+        }
     }
 
-    private boolean shouldDecreaseStock(Order order) {
-        return OrderStatusField.PAID.equals(order.getStatus())
-                || OrderStatusField.CONFIRMED.equals(order.getStatus());
+    private BigDecimal calculateCouponDiscount(Coupon coupon, BigDecimal subTotal) {
+        BigDecimal discount = coupon.getType() == CouponType.PERCENTAGE
+                ? subTotal.multiply(coupon.getValue()).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP)
+                : coupon.getValue();
+
+        if (coupon.getMaxDiscount() != null && discount.compareTo(coupon.getMaxDiscount()) > 0) {
+            discount = coupon.getMaxDiscount();
+        }
+
+        return discount.min(subTotal).max(ZERO).setScale(2, RoundingMode.HALF_UP);
     }
 
-    private void decrementStock(List<ValidatedCartItem> items) {
-        for (ValidatedCartItem item : items) {
+    private void reserveInventory(List<CheckoutItem> items) {
+        for (CheckoutItem item : items) {
             Variant variant = item.variant();
             long currentStock = variant.getStock() == null ? 0L : variant.getStock();
             if (currentStock < item.quantity()) {
@@ -260,11 +335,96 @@ public class OrderServiceImpl implements OrderService {
         }
     }
 
-    private float resolveLatestPrice(Variant variant) {
-        if (variant.getDiscountPrice() != null && variant.getDiscountPrice() > 0) {
-            return variant.getDiscountPrice();
+    private void reserveFlashSaleQuota(List<CheckoutItem> items) {
+        for (CheckoutItem item : items) {
+            flashSaleService.applyFlashSaleWhenCheckout(item.variant().getId(), item.quantity());
         }
-        return variant.getPrice() == null ? 0F : variant.getPrice();
+    }
+
+    private List<OrderDetail> createOrderDetails(Order order, List<CheckoutItem> checkoutItems) {
+        return checkoutItems.stream()
+                .map(item -> orderDetailRepository.save(OrderDetail.builder()
+                        .order(order)
+                        .variant(item.variant())
+                        .numberOfProducts(item.quantity())
+                        .price(item.unitPrice())
+                        .totalMoney(item.unitPrice().multiply(BigDecimal.valueOf(item.quantity())).setScale(2, RoundingMode.HALF_UP))
+                        .color(item.variant().getColor())
+                        .build()))
+                .toList();
+    }
+
+    private void updateOrderStatusAfterCheckout(Order order, OrderDTO orderDTO) {
+        String paymentMethod = normalizePaymentMethod(order.getPaymentMethod());
+        if ("COD".equals(paymentMethod)) {
+            order.setStatus(OrderStatusField.CONFIRMED);
+            order.setPaymentStatus(OrderStatusField.CONFIRMED);
+            order.setPaymentDate(LocalDateTime.now().toString());
+            return;
+        }
+
+        if (Boolean.TRUE.equals(orderDTO.getPaymentSuccess())) {
+            order.setStatus(OrderStatusField.PAID);
+            order.setPaymentStatus(OrderStatusField.PAID);
+            order.setPaymentDate(LocalDateTime.now().toString());
+        }
+    }
+
+    private boolean isPaymentCompletedAtCheckout(Order order, OrderDTO orderDTO) {
+        String paymentMethod = normalizePaymentMethod(order.getPaymentMethod());
+        if ("COD".equals(paymentMethod)) {
+            return true;
+        }
+        return Boolean.TRUE.equals(orderDTO.getPaymentSuccess());
+    }
+
+    private void releaseReservedInventory(Order order) {
+        if (order.getOrderDetails() == null) {
+            return;
+        }
+
+        for (OrderDetail orderDetail : order.getOrderDetails()) {
+            Variant variant = variantRepository.findByIdForUpdate(orderDetail.getVariant().getId())
+                    .orElseThrow(() -> new AppException(StatusCode.VARIANT_NOT_FOUND));
+            long currentStock = variant.getStock() == null ? 0L : variant.getStock();
+            variant.setStock(currentStock + orderDetail.getNumberOfProducts());
+            variantRepository.save(variant);
+            flashSaleService.releaseFlashSaleReservation(variant.getId(), orderDetail.getNumberOfProducts());
+        }
+    }
+
+    private void releaseCouponUsage(String couponCode) {
+        if (couponCode == null || couponCode.isBlank()) {
+            return;
+        }
+
+        couponRepository.findByCodeForUpdate(couponCode)
+                .ifPresent(coupon -> {
+                    int usedCount = coupon.getUsedCount() == null ? 0 : coupon.getUsedCount();
+                    coupon.setUsedCount(Math.max(0, usedCount - 1));
+                    couponRepository.save(coupon);
+                });
+    }
+
+    private BigDecimal resolveCurrentUnitPrice(Variant variant) {
+        BigDecimal flashSalePrice = BigDecimal.valueOf(flashSaleService.getFlashSalePrice(variant.getId()))
+                .setScale(2, RoundingMode.HALF_UP);
+
+        BigDecimal basePrice = resolveVariantBasePrice(variant);
+        if (flashSalePrice.signum() > 0 && flashSalePrice.compareTo(basePrice) < 0) {
+            return flashSalePrice;
+        }
+        return basePrice;
+    }
+
+    private BigDecimal resolveVariantBasePrice(Variant variant) {
+        if (variant.getDiscountPrice() != null && variant.getDiscountPrice().signum() > 0) {
+            return variant.getDiscountPrice().setScale(2, RoundingMode.HALF_UP);
+        }
+        if (variant.getPrice() != null && variant.getPrice().signum() > 0) {
+            return variant.getPrice().setScale(2, RoundingMode.HALF_UP);
+        }
+        return ZERO;
     }
 
     private int resolveVariantWeight(Variant variant) {
@@ -282,6 +442,9 @@ public class OrderServiceImpl implements OrderService {
         return paymentMethod == null ? "" : paymentMethod.trim().toUpperCase();
     }
 
-    private record ValidatedCartItem(Variant variant, int quantity, float unitPrice) {
+    private record CheckoutItem(Variant variant, int quantity, BigDecimal unitPrice) {
+    }
+
+    private record CouponApplication(String couponCode, BigDecimal discountAmount) {
     }
 }

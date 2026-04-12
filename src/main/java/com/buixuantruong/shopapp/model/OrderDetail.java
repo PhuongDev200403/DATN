@@ -4,6 +4,8 @@ import com.fasterxml.jackson.annotation.JsonBackReference;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.math.BigDecimal;
+
 @Entity
 @Table(name = "order_details")
 @Getter
@@ -25,14 +27,14 @@ public class OrderDetail {
     @JoinColumn(name = "variant_id")
     private Variant variant;
 
-    @Column(name = "price", nullable = false)
-    private Float price;
+    @Column(name = "price", nullable = false, precision = 19, scale = 2)
+    private BigDecimal price;
 
     @Column(name = "number_of_products", nullable = false)
     private Integer numberOfProducts;
 
-    @Column(name = "total_money", nullable = false)
-    private Long totalMoney;
+    @Column(name = "total_money", nullable = false, precision = 19, scale = 2)
+    private BigDecimal totalMoney;
 
     @Column(name = "color")
     private String color;

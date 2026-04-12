@@ -25,6 +25,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -75,6 +76,7 @@ public class ProductServiceImpl implements ProductService {
                 .map(productMapper::toResponse);
     }
 
+    //Phương thức hiển thị carousel sản phẩm mới
     @Override
     public Page<ProductResponse> getNewProducts(int months, PageRequest pageRequest) {
         int effectiveMonths = months <= 0 ? 6 : months;
@@ -143,12 +145,12 @@ public class ProductServiceImpl implements ProductService {
         Product product = productRepository.findById(productId)
                 .orElseThrow(() -> new AppException(StatusCode.PRODUCT_NOT_FOUND));
 
-        Float basePrice = extractBasePrice(product);
+        BigDecimal basePrice = extractBasePrice(product);
         Float minPrice = null;
         Float maxPrice = null;
-        if (basePrice != null && basePrice > 0) {
-            minPrice = basePrice * 0.8f;
-            maxPrice = basePrice * 1.2f;
+        if (basePrice != null && basePrice.signum() > 0) {
+            minPrice = basePrice.multiply(BigDecimal.valueOf(0.8d)).floatValue();
+            maxPrice = basePrice.multiply(BigDecimal.valueOf(1.2d)).floatValue();
         }
 
         return productRepository.findSimilarCandidates(product.getId(), product.getCategory().getId(), minPrice, maxPrice)
@@ -218,24 +220,26 @@ public class ProductServiceImpl implements ProductService {
                 .toList();
     }
 
-    private Float extractBasePrice(Product product) {
+    private BigDecimal extractBasePrice(Product product) {
         return product.getVariants() == null ? null : product.getVariants().stream()
                 .map(Variant::getPrice)
                 .filter(price -> price != null)
-                .min(Float::compareTo)
+                .min(BigDecimal::compareTo)
                 .orElse(null);
     }
 
     private double calculateSimilarityScore(Product baseProduct, Product candidate) {
         double categoryScore = 5.0;
-        Float basePrice = extractBasePrice(baseProduct);
-        Float candidatePrice = extractBasePrice(candidate);
-        if (basePrice == null || candidatePrice == null || basePrice <= 0) {
+        BigDecimal basePrice = extractBasePrice(baseProduct);
+        BigDecimal candidatePrice = extractBasePrice(candidate);
+        if (basePrice == null || candidatePrice == null || basePrice.signum() <= 0) {
             return categoryScore;
         }
 
-        double maxAllowedDiff = basePrice * 0.2;
-        double actualDiff = Math.abs(basePrice - candidatePrice);
+        double basePriceValue = basePrice.doubleValue();
+        double candidatePriceValue = candidatePrice.doubleValue();
+        double maxAllowedDiff = basePriceValue * 0.2d;
+        double actualDiff = Math.abs(basePriceValue - candidatePriceValue);
         double similarityRatio = Math.max(0.0, 1.0 - (actualDiff / maxAllowedDiff));
         double priceScore = similarityRatio * 3.0;
         return categoryScore + priceScore;

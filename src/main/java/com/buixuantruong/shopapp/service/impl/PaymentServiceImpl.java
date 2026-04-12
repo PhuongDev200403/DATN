@@ -8,6 +8,7 @@ import com.buixuantruong.shopapp.model.Order;
 import com.buixuantruong.shopapp.model.Payment;
 import com.buixuantruong.shopapp.repository.OrderRepository;
 import com.buixuantruong.shopapp.repository.PaymentRepository;
+import com.buixuantruong.shopapp.service.OrderService;
 import com.buixuantruong.shopapp.service.PaymentService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
@@ -15,166 +16,139 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.io.UnsupportedEncodingException;
+import java.math.BigDecimal;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.time.LocalDateTime;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.TimeZone;
 
 @Service
 @RequiredArgsConstructor
 public class PaymentServiceImpl implements PaymentService {
     private final PaymentRepository paymentRepository;
     private final OrderRepository orderRepository;
+    private final OrderService orderService;
 
     @Override
     public String createPayment(PaymentDTO paymentDTO, HttpServletRequest request) throws UnsupportedEncodingException {
         Order order = orderRepository.findById(paymentDTO.getOrderId())
                 .orElseThrow(() -> new AppException(StatusCode.ORDER_NOT_FOUND));
+        if (order.getTotalMoney() == null || order.getTotalMoney().signum() <= 0) {
+            throw new AppException(StatusCode.INVALID_REQUEST);
+        }
 
-        String vnp_Version = VNPayConfig.vnp_Version;
-        String vnp_Command = VNPayConfig.vnp_Command;
-        String vnp_TmnCode = VNPayConfig.vnp_TmnCode;
-        String vnp_TxnRef = VNPayConfig.getRandomNumber(8);
-        String vnp_OrderInfo = "Thanh toan don hang #" + order.getId();
-        String vnp_OrderType = "other";
-        String vnp_IpAddr = getIpAddress(request);
-        
-        // Convert amount to VNĐ (x100 because VNPay requires amount in cents)
-        long amount = Math.round(paymentDTO.getAmount() * 100);
-        String vnp_Amount = String.valueOf(amount);
-        
-        Map<String, String> vnp_Params = new HashMap<>();
-        vnp_Params.put("vnp_Version", vnp_Version);
-        vnp_Params.put("vnp_Command", vnp_Command);
-        vnp_Params.put("vnp_TmnCode", vnp_TmnCode);
-        vnp_Params.put("vnp_Amount", vnp_Amount);
-        vnp_Params.put("vnp_CurrCode", "VND");
-        
-        // Get current time in GMT+7
-        Calendar cld = Calendar.getInstance(TimeZone.getTimeZone("Etc/GMT+7"));
+        String vnpVersion = VNPayConfig.vnp_Version;
+        String vnpCommand = VNPayConfig.vnp_Command;
+        String vnpTmnCode = VNPayConfig.vnp_TmnCode;
+        String vnpTxnRef = VNPayConfig.getRandomNumber(8);
+        String vnpOrderInfo = "Thanh toan don hang #" + order.getId();
+        String vnpOrderType = "other";
+        String vnpIpAddr = getIpAddress(request);
+
+        long amount = order.getTotalMoney()
+                .multiply(BigDecimal.valueOf(100))
+                .longValueExact();
+        String vnpAmount = String.valueOf(amount);
+
+        Map<String, String> vnpParams = new HashMap<>();
+        vnpParams.put("vnp_Version", vnpVersion);
+        vnpParams.put("vnp_Command", vnpCommand);
+        vnpParams.put("vnp_TmnCode", vnpTmnCode);
+        vnpParams.put("vnp_Amount", vnpAmount);
+        vnpParams.put("vnp_CurrCode", "VND");
+
+        Calendar calendar = Calendar.getInstance(TimeZone.getTimeZone("Etc/GMT+7"));
         SimpleDateFormat formatter = new SimpleDateFormat("yyyyMMddHHmmss");
-        String vnp_CreateDate = formatter.format(cld.getTime());
-        vnp_Params.put("vnp_CreateDate", vnp_CreateDate);
-        
-        // Calculate expiry date (15 minutes from now)
-        cld.add(Calendar.MINUTE, 15);
-        String vnp_ExpireDate = formatter.format(cld.getTime());
-        vnp_Params.put("vnp_ExpireDate", vnp_ExpireDate);
-        
-        vnp_Params.put("vnp_IpAddr", vnp_IpAddr);
-        vnp_Params.put("vnp_Locale", "vn");
-        vnp_Params.put("vnp_OrderInfo", vnp_OrderInfo);
-        vnp_Params.put("vnp_OrderType", vnp_OrderType);
-        vnp_Params.put("vnp_ReturnUrl", request.getScheme() + "://" + request.getServerName() + ":" + request.getServerPort() + VNPayConfig.vnp_ReturnUrl);
-        vnp_Params.put("vnp_TxnRef", vnp_TxnRef);
-        
-        // Build query string
-        List<String> fieldNames = new ArrayList<>(vnp_Params.keySet());
+        String vnpCreateDate = formatter.format(calendar.getTime());
+        vnpParams.put("vnp_CreateDate", vnpCreateDate);
+
+        calendar.add(Calendar.MINUTE, 15);
+        String vnpExpireDate = formatter.format(calendar.getTime());
+        vnpParams.put("vnp_ExpireDate", vnpExpireDate);
+
+        vnpParams.put("vnp_IpAddr", vnpIpAddr);
+        vnpParams.put("vnp_Locale", "vn");
+        vnpParams.put("vnp_OrderInfo", vnpOrderInfo);
+        vnpParams.put("vnp_OrderType", vnpOrderType);
+        vnpParams.put("vnp_ReturnUrl", request.getScheme() + "://" + request.getServerName() + ":" + request.getServerPort() + VNPayConfig.vnp_ReturnUrl);
+        vnpParams.put("vnp_TxnRef", vnpTxnRef);
+
+        List<String> fieldNames = new ArrayList<>(vnpParams.keySet());
         Collections.sort(fieldNames);
         StringBuilder hashData = new StringBuilder();
         StringBuilder query = new StringBuilder();
-        
-        Iterator<String> itr = fieldNames.iterator();
-        while (itr.hasNext()) {
-            String fieldName = itr.next();
-            String fieldValue = vnp_Params.get(fieldName);
-            if ((fieldValue != null) && (fieldValue.length() > 0)) {
-                // Build hash data
-                hashData.append(fieldName).append('=').append(URLEncoder.encode(fieldValue, StandardCharsets.US_ASCII.toString()));
-                // Build query
-                query.append(URLEncoder.encode(fieldName, StandardCharsets.US_ASCII.toString())).append('=')
-                        .append(URLEncoder.encode(fieldValue, StandardCharsets.US_ASCII.toString()));
-                if (itr.hasNext()) {
+
+        Iterator<String> iterator = fieldNames.iterator();
+        while (iterator.hasNext()) {
+            String fieldName = iterator.next();
+            String fieldValue = vnpParams.get(fieldName);
+            if (fieldValue != null && !fieldValue.isEmpty()) {
+                hashData.append(fieldName).append('=').append(URLEncoder.encode(fieldValue, StandardCharsets.US_ASCII));
+                query.append(URLEncoder.encode(fieldName, StandardCharsets.US_ASCII))
+                        .append('=')
+                        .append(URLEncoder.encode(fieldValue, StandardCharsets.US_ASCII));
+                if (iterator.hasNext()) {
                     query.append('&');
                     hashData.append('&');
                 }
             }
         }
-        
-        String queryUrl = query.toString();
-        String vnp_SecureHash = VNPayConfig.hmacSHA512(VNPayConfig.vnp_HashSecret, hashData.toString());
-        queryUrl += "&vnp_SecureHash=" + vnp_SecureHash;
-        String paymentUrl = VNPayConfig.vnp_PayUrl + "?" + queryUrl;
-        
-        // Kiểm tra xem đã tồn tại payment nào cho order này chưa
+
+        String vnpSecureHash = VNPayConfig.hmacSHA512(VNPayConfig.vnp_HashSecret, hashData.toString());
+        String paymentUrl = VNPayConfig.vnp_PayUrl + "?" + query + "&vnp_SecureHash=" + vnpSecureHash;
+
         Optional<Payment> existingPayment = paymentRepository.findByOrderId(order.getId());
-        
-        Payment payment;
-        if (existingPayment.isPresent()) {
-            // Nếu đã tồn tại payment, cập nhật thông tin mới
-            payment = existingPayment.get();
-            payment.setAmount(paymentDTO.getAmount());
-            payment.setTransactionId(vnp_TxnRef);
-            payment.setTransactionStatus("PENDING");
-            payment.setPaymentDate(LocalDateTime.now());
-        } else {
-            // Nếu chưa tồn tại, tạo payment mới
-            payment = Payment.builder()
-                    .order(order)
-                    .paymentMethod("VNPAY")
-                    .amount(paymentDTO.getAmount())
-                    .transactionId(vnp_TxnRef)
-                    .transactionStatus("PENDING")
-                    .paymentDate(LocalDateTime.now())
-                    .build();
-        }
-        
+        Payment payment = existingPayment.orElseGet(() -> Payment.builder()
+                .order(order)
+                .paymentMethod("VNPAY")
+                .build());
+        payment.setAmount(order.getTotalMoney());
+        payment.setTransactionId(vnpTxnRef);
+        payment.setTransactionStatus("PENDING");
+        payment.setPaymentDate(LocalDateTime.now());
         save(payment);
-        
+
         return paymentUrl;
     }
 
     @Override
     @Transactional
     public Payment processVnPayPayment(Map<String, String> vnpParams) {
-        String vnp_TxnRef = vnpParams.get("vnp_TxnRef");
-        String vnp_ResponseCode = vnpParams.get("vnp_ResponseCode");
-        String vnp_TransactionStatus = vnpParams.get("vnp_TransactionStatus");
-        String vnp_BankCode = vnpParams.get("vnp_BankCode");
-        String vnp_OrderInfo = vnpParams.get("vnp_OrderInfo");
-        
-        // Tìm payment bằng transactionId trước
-        Optional<Payment> paymentOptional = paymentRepository.findByTransactionId(vnp_TxnRef);
-        
-        // Nếu không tìm thấy qua transactionId, thử tìm qua orderId từ vnp_OrderInfo
-        if (paymentOptional.isEmpty() && vnp_OrderInfo != null && vnp_OrderInfo.contains("#")) {
+        String vnpTxnRef = vnpParams.get("vnp_TxnRef");
+        String vnpResponseCode = vnpParams.get("vnp_ResponseCode");
+        String vnpTransactionStatus = vnpParams.get("vnp_TransactionStatus");
+        String vnpBankCode = vnpParams.get("vnp_BankCode");
+        String vnpOrderInfo = vnpParams.get("vnp_OrderInfo");
+
+        Optional<Payment> paymentOptional = paymentRepository.findByTransactionId(vnpTxnRef);
+        if (paymentOptional.isEmpty() && vnpOrderInfo != null && vnpOrderInfo.contains("#")) {
+            String orderIdPart = vnpOrderInfo.substring(vnpOrderInfo.indexOf('#') + 1);
             try {
-                String orderIdStr = vnp_OrderInfo.substring(vnp_OrderInfo.indexOf("#") + 1);
-                Long orderId = Long.parseLong(orderIdStr);
-                System.out.println("Extracted orderId from vnp_OrderInfo: " + orderId);
-                
-                // Thử tìm payment qua orderId
+                Long orderId = Long.parseLong(orderIdPart);
                 paymentOptional = paymentRepository.findByOrderId(orderId);
-                System.out.println("Looking for payment by orderId: " + orderId);
-            } catch (Exception e) {
-                System.out.println("Could not extract or process orderId from vnp_OrderInfo: " + vnp_OrderInfo);
+            } catch (NumberFormatException ignored) {
             }
         }
-        
-        // Nếu vẫn không tìm thấy, throw exception
-        if (paymentOptional.isEmpty()) {
-            System.out.println("Payment not found with transaction ID: " + vnp_TxnRef + " or from order info: " + vnp_OrderInfo);
-            throw new AppException(StatusCode.PAYMENT_NOT_FOUND);
-        }
-        
-        Payment payment = paymentOptional.get();
-        
-        // Update payment status based on VNPay response
-        if ("00".equals(vnp_ResponseCode) && "00".equals(vnp_TransactionStatus)) {
-            payment.setTransactionStatus("SUCCESS");
-            payment.setBankCode(vnp_BankCode);
-            payment.setPaymentDate(LocalDateTime.now());
-            
-            // Update order status
-            Order order = payment.getOrder();
-            order.setStatus("PAID");
-            orderRepository.save(order);
-        } else {
-            payment.setTransactionStatus("FAILED");
-        }
-        
-        return paymentRepository.save(payment);
+
+        Payment payment = paymentOptional.orElseThrow(() -> new AppException(StatusCode.PAYMENT_NOT_FOUND));
+        boolean paymentSuccessful = "00".equals(vnpResponseCode) && "00".equals(vnpTransactionStatus);
+
+        payment.setTransactionStatus(paymentSuccessful ? "SUCCESS" : "FAILED");
+        payment.setBankCode(vnpBankCode);
+        payment.setPaymentDate(LocalDateTime.now());
+        paymentRepository.save(payment);
+
+        orderService.finalizeOnlinePayment(payment.getOrder().getId(), paymentSuccessful);
+        return payment;
     }
 
     @Override
@@ -187,17 +161,13 @@ public class PaymentServiceImpl implements PaymentService {
     public Payment save(Payment payment) {
         return paymentRepository.save(payment);
     }
-    
+
     private String getIpAddress(HttpServletRequest request) {
-        String ipAddress;
         try {
-            ipAddress = request.getHeader("X-FORWARDED-FOR");
-            if (ipAddress == null) {
-                ipAddress = request.getRemoteAddr();
-            }
-        } catch (Exception e) {
-            ipAddress = "127.0.0.1";
+            String forwarded = request.getHeader("X-FORWARDED-FOR");
+            return forwarded != null ? forwarded : request.getRemoteAddr();
+        } catch (Exception exception) {
+            return "127.0.0.1";
         }
-        return ipAddress;
     }
-} 
+}

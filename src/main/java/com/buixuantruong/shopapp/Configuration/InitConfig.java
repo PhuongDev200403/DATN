@@ -17,7 +17,7 @@ public class InitConfig implements CommandLineRunner {
 
     @Override
     public void run(String... args) {
-        if (userRepository.findByEmail("admin@gmail.com").isEmpty()) {
+        if (userRepository.findByPhoneNumber("0327391502").isEmpty()) {
             User admin = User.builder()
                     .fullName("admin")
                     .email("admin@gmail.com")

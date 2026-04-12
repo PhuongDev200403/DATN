@@ -5,6 +5,9 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.math.BigDecimal;
 
 @Data
 @NoArgsConstructor
@@ -12,13 +15,13 @@ import lombok.NoArgsConstructor;
 //@Builder
 public class VariantDTO {
     private String sku;
-    private Float price;
-    private Float discountPrice;
+    private BigDecimal price;
+    private BigDecimal discountPrice;
     private Long stock;
     private String color;
     private String storage;
 //    private String ram;
-    private String imageUrl;
+    private MultipartFile imageUrl;
     private Boolean isActive;
     private String barcode;
     private Integer weight;

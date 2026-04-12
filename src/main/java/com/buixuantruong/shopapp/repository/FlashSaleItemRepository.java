@@ -19,7 +19,6 @@ public interface FlashSaleItemRepository extends JpaRepository<FlashSaleItem, Lo
             JOIN FETCH fsi.flashSale fs
             JOIN FETCH fsi.variant v
             WHERE fsi.active = true
-              AND fs.active = true
               AND fs.startTime <= :now
               AND fs.endTime >= :now
               AND COALESCE(fsi.quantitySold, 0) < fsi.quantityLimit
@@ -34,7 +33,6 @@ public interface FlashSaleItemRepository extends JpaRepository<FlashSaleItem, Lo
             JOIN FETCH fsi.variant v
             WHERE v.id = :variantId
               AND fsi.active = true
-              AND fs.active = true
               AND fs.startTime <= :now
               AND fs.endTime >= :now
               AND COALESCE(fsi.quantitySold, 0) < fsi.quantityLimit
@@ -53,7 +51,6 @@ public interface FlashSaleItemRepository extends JpaRepository<FlashSaleItem, Lo
             JOIN FETCH fsi.variant v
             WHERE v.id = :variantId
               AND fsi.active = true
-              AND fs.active = true
               AND fs.startTime <= :now
               AND fs.endTime >= :now
             ORDER BY fs.priority DESC, fs.startTime ASC

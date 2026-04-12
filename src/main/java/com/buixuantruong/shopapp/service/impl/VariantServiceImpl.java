@@ -13,14 +13,24 @@ import com.buixuantruong.shopapp.model.Specification;
 import com.buixuantruong.shopapp.model.Variant;
 import com.buixuantruong.shopapp.repository.ProductRepository;
 import com.buixuantruong.shopapp.repository.VariantRepository;
+import com.buixuantruong.shopapp.repository.ProductUnitRepository;
+import com.buixuantruong.shopapp.model.ProductUnitStatus;
+import com.buixuantruong.shopapp.service.ProductUnitService;
 import com.buixuantruong.shopapp.service.VariantService;
+import com.cloudinary.Cloudinary;
+import com.cloudinary.utils.ObjectUtils;
 import jakarta.transaction.Transactional;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
+import lombok.experimental.NonFinal;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -30,10 +40,17 @@ public class VariantServiceImpl implements VariantService {
     ProductRepository productRepository;
     VariantMapper variantMapper;
     SpecificationMapper specificationMapper;
+    Cloudinary cloudinary;
+    ProductUnitService productUnitService;
+    ProductUnitRepository productUnitRepository;
+
+    @Value("${cloudinary.folder:shopapp}")
+    @NonFinal
+    String cloudinaryFolder;
 
     @Override
     @Transactional
-    public VariantResponse createVariant(VariantDTO variantDTO) {
+    public VariantResponse createVariant(VariantDTO variantDTO, MultipartFile file) {
         validateVariantPayload(variantDTO);
         if (variantRepository.existsBySku(variantDTO.getSku())) {
             throw new AppException(StatusCode.INVALID_DATA);
@@ -42,10 +59,13 @@ public class VariantServiceImpl implements VariantService {
         Product product = findProduct(variantDTO.getProductId());
         Variant variant = variantMapper.toVariant(variantDTO);
         variant.setProduct(product);
+        variant.setImageUrl(uploadVariantFileIfPresent(resolveUploadedFile(variantDTO, file)));
         applyDefaultValues(variant);
         variant.setSpecification(buildSpecification(variant, variantDTO.getSpecification()));
-
-        return variantMapper.toResponse(variantRepository.save(variant));
+        Variant savedVariant = variantRepository.save(variant);
+        long initialQuantity = savedVariant.getStock() == null ? 0L : savedVariant.getStock();
+        productUnitService.generateUnits(savedVariant.getId(), initialQuantity);
+        return variantMapper.toResponse(savedVariant);
     }
 
     @Override
@@ -72,7 +92,7 @@ public class VariantServiceImpl implements VariantService {
 
     @Override
     @Transactional
-    public VariantResponse updateVariant(Long id, VariantDTO variantDTO) {
+    public VariantResponse updateVariant(Long id, VariantDTO variantDTO, MultipartFile file) {
         validateVariantPayload(variantDTO);
 
         Variant existingVariant = findVariant(id);
@@ -85,6 +105,10 @@ public class VariantServiceImpl implements VariantService {
         Product product = findProduct(variantDTO.getProductId());
         variantMapper.updateVariantFromDto(variantDTO, existingVariant);
         existingVariant.setProduct(product);
+        MultipartFile uploadedFile = resolveUploadedFile(variantDTO, file);
+        if (uploadedFile != null && !uploadedFile.isEmpty()) {
+            existingVariant.setImageUrl(uploadVariantFile(uploadedFile));
+        }
         applyDefaultValues(existingVariant);
         mergeSpecification(existingVariant, variantDTO.getSpecification());
 
@@ -93,28 +117,34 @@ public class VariantServiceImpl implements VariantService {
 
     @Override
     @Transactional
-    public VariantResponse updateStock(Long id, Long purchasedQuantity) {
-        if (purchasedQuantity == null || purchasedQuantity <= 0) {
+    public VariantResponse updateStock(Long id, Long newStock) {
+        if (newStock == null || newStock < 0) {
             throw new AppException(StatusCode.INVALID_QUANTITY);
         }
 
         Variant variant = findVariant(id);
-        long currentStock = variant.getStock() == null ? 0L : variant.getStock();
-        if (currentStock < purchasedQuantity) {
-            throw new AppException(StatusCode.INVALID_QUANTITY);
+        long currentAvailableUnits = productUnitRepository.countByVariantIdAndStatusAndOrderIsNull(
+                variant.getId(),
+                ProductUnitStatus.IN_STOCK
+        );
+
+        if (newStock > currentAvailableUnits) {
+            productUnitService.generateUnits(variant.getId(), newStock - currentAvailableUnits);
+            currentAvailableUnits = newStock;
         }
 
-        variant.setStock(currentStock - purchasedQuantity);
+        // Never delete physical units when requested stock is lower than current available units.
+        variant.setStock(currentAvailableUnits);
         return variantMapper.toResponse(variantRepository.save(variant));
     }
 
     @Override
     @Transactional
-    public VariantResponse updatePrice(Long id, Float price, Float discountPrice) {
-        if (price == null || price < 0) {
+    public VariantResponse updatePrice(Long id, BigDecimal price, BigDecimal discountPrice) {
+        if (price == null || price.signum() < 0) {
             throw new AppException(StatusCode.INVALID_DATA);
         }
-        if (discountPrice != null && discountPrice < 0) {
+        if (discountPrice != null && discountPrice.signum() < 0) {
             throw new AppException(StatusCode.INVALID_DATA);
         }
 
@@ -153,7 +183,7 @@ public class VariantServiceImpl implements VariantService {
 
     private void applyDefaultValues(Variant variant) {
         if (variant.getPrice() == null) {
-            variant.setPrice(0F);
+            variant.setPrice(BigDecimal.ZERO);
         }
         if (variant.getStock() == null) {
             variant.setStock(0L);
@@ -189,4 +219,41 @@ public class VariantServiceImpl implements VariantService {
             specification.setWeight(variant.getWeight());
         }
     }
+
+    private String uploadVariantFileIfPresent(MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            return null;
+        }
+        return uploadVariantFile(file);
+    }
+
+    private MultipartFile resolveUploadedFile(VariantDTO variantDTO, MultipartFile file) {
+        if (file != null && !file.isEmpty()) {
+            return file;
+        }
+        if (variantDTO == null) {
+            return null;
+        }
+        MultipartFile dtoFile = variantDTO.getImageUrl();
+        return (dtoFile == null || dtoFile.isEmpty()) ? null : dtoFile;
+    }
+
+    private String uploadVariantFile(MultipartFile file) {
+        try {
+            Map<?, ?> uploadResult = cloudinary.uploader().upload(
+                    file.getBytes(),
+                    ObjectUtils.asMap(
+                            "folder", cloudinaryFolder + "/variants",
+                            "resource_type", "image"
+                    )
+            );
+            return String.valueOf(uploadResult.get("secure_url"));
+        } catch (Exception exception) {
+            throw new AppException(
+                    StatusCode.INVALID_REQUEST,
+                    "Cloudinary upload failed: " + exception.getMessage()
+            );
+        }
+    }
+
 }

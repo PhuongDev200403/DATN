@@ -1,35 +1,25 @@
 package com.buixuantruong.shopapp.controller;
 
 import com.buixuantruong.shopapp.dto.ProductDTO;
-import com.buixuantruong.shopapp.dto.response.ApiResponse;
-import com.buixuantruong.shopapp.dto.response.CloudinaryUploadResponse;
-import com.buixuantruong.shopapp.dto.response.MessageResponse;
-import com.buixuantruong.shopapp.dto.response.ProductListResponse;
-import com.buixuantruong.shopapp.dto.response.ProductResponse;
-import com.buixuantruong.shopapp.exception.AppException;
+import com.buixuantruong.shopapp.dto.response.*;
 import com.buixuantruong.shopapp.exception.StatusCode;
 import com.buixuantruong.shopapp.service.ProductService;
-import com.cloudinary.Cloudinary;
-import com.cloudinary.utils.ObjectUtils;
+import com.buixuantruong.shopapp.service.impl.ChatServiceImpl;
 import jakarta.validation.Valid;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
-import lombok.experimental.NonFinal;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.validation.BindingResult;
-import org.springframework.validation.FieldError;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
 
 import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/products")
@@ -37,18 +27,12 @@ import java.util.Map;
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class ProductController {
     ProductService productService;
-    Cloudinary cloudinary;
+    ChatServiceImpl chatService;
 
-    @Value("${cloudinary.folder:shopapp}")
-    @NonFinal
-    String cloudinaryFolder;
+
 
     @PostMapping(value = "", consumes = MediaType.APPLICATION_JSON_VALUE)
-    public ApiResponse<ProductResponse> createProduct(@Valid @RequestBody ProductDTO productDTO, BindingResult bindingResult) throws Exception {
-        if (bindingResult.hasErrors()) {
-            List<String> errorMessage = bindingResult.getFieldErrors().stream().map(FieldError::getDefaultMessage).toList();
-            throw new AppException(StatusCode.VALIDATION_ERROR);
-        }
+    public ApiResponse<ProductResponse> createProduct(@Valid @RequestBody ProductDTO productDTO) throws Exception {
         return ApiResponse.<ProductResponse>builder()
                 .code(StatusCode.SUCCESS.getCode())
                 .message(StatusCode.SUCCESS.getMessage())
@@ -110,15 +94,6 @@ public class ProductController {
                 .message(StatusCode.SUCCESS.getMessage())
                 .result(new ProductListResponse(products.getContent(), products.getTotalPages()))
                 .build();
-    }
-
-    @PostMapping("/upload-image")
-    public ResponseEntity<ApiResponse<CloudinaryUploadResponse>> uploadImage(@RequestPart("file") MultipartFile file) throws java.io.IOException {
-        return ResponseEntity.ok(ApiResponse.<CloudinaryUploadResponse>builder()
-                .code(StatusCode.SUCCESS.getCode())
-                .message(StatusCode.SUCCESS.getMessage())
-                .result(uploadProductImage(file))
-                .build());
     }
 
     @GetMapping("/{id}")
@@ -195,23 +170,8 @@ public class ProductController {
                 .build();
     }
 
-    private CloudinaryUploadResponse uploadProductImage(MultipartFile file) throws java.io.IOException {
-        if (file == null || file.isEmpty()) {
-            throw new AppException(StatusCode.FILE_EMPTY);
-        }
-
-        Map<?, ?> uploadResult = cloudinary.uploader().upload(
-                file.getBytes(),
-                ObjectUtils.asMap(
-                        "folder", cloudinaryFolder,
-                        "resource_type", "image"
-                )
-        );
-
-        return CloudinaryUploadResponse.builder()
-                .url(String.valueOf(uploadResult.get("secure_url")))
-                .publicId(String.valueOf(uploadResult.get("public_id")))
-                .originalFilename(file.getOriginalFilename())
-                .build();
-    }
+//    @PostMapping("/search")
+//    public List<ListAndSearchVariantResponse> search(@RequestParam("keyword") String keyword){
+//        return productService.searchProducts(null, keyword, null, null, null);
+//    }
 }

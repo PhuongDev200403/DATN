@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 @Repository
@@ -18,15 +19,15 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
 
     // Tổng doanh thu
     @Query("SELECT COALESCE(SUM(o.totalMoney), 0) FROM Order o WHERE o.status = 'DELIVERED'")
-    Long getTotalRevenue();
+    BigDecimal getTotalRevenue();
 
     // Doanh thu tháng hiện tại
     @Query(value = "SELECT COALESCE(SUM(total_money), 0) FROM orders WHERE status = 'DELIVERED' AND MONTH(order_date) = MONTH(CURRENT_DATE()) AND YEAR(order_date) = YEAR(CURRENT_DATE())", nativeQuery = true)
-    Long getRevenueThisMonth();
+    BigDecimal getRevenueThisMonth();
 
     // Doanh thu tháng trước
     @Query(value = "SELECT COALESCE(SUM(total_money), 0) FROM orders WHERE status = 'DELIVERED' AND MONTH(order_date) = MONTH(DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH)) AND YEAR(order_date) = YEAR(DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH))", nativeQuery = true)
-    Long getRevenueLastMonth();
+    BigDecimal getRevenueLastMonth();
 
     // Đếm đơn hàng tháng này
     @Query(value = "SELECT COUNT(*) FROM orders WHERE MONTH(order_date) = MONTH(CURRENT_DATE()) AND YEAR(order_date) = YEAR(CURRENT_DATE())", nativeQuery = true)

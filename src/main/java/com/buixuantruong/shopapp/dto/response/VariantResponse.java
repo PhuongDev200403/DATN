@@ -6,6 +6,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
+
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -13,8 +15,8 @@ import lombok.NoArgsConstructor;
 public class VariantResponse {
     private Long id;
     private String sku;
-    private Float price;
-    private Float discountPrice;
+    private BigDecimal price;
+    private BigDecimal discountPrice;
     private Long stock;
     private String color;
     private String storage;
@@ -23,6 +25,7 @@ public class VariantResponse {
     private Boolean isActive;
     private String barcode;
     private Integer weight;
+    private String productName;
     private Long productId;
     private SpecificationResponse specification;
 

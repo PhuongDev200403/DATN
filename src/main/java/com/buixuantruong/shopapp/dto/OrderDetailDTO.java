@@ -4,6 +4,8 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.constraints.Min;
 import lombok.*;
 
+import java.math.BigDecimal;
+
 @Data
 @Getter
 @Setter
@@ -19,7 +21,7 @@ public class OrderDetailDTO {
     private Long variantId;
 
     @Min(value = 1, message = "price must be higher 0")
-    private Float price;
+    private BigDecimal price;
 
 
     @Min(value = 1, message = "number id must be higher 1")
@@ -27,7 +29,7 @@ public class OrderDetailDTO {
 
 
     @Min(value = 0, message = "total money must be > 0")
-    private Long totalMoney;
+    private BigDecimal totalMoney;
 
     private String color;
 }

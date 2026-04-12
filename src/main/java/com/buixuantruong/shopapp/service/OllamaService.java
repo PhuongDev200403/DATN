@@ -12,6 +12,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 
@@ -181,11 +182,12 @@ public class OllamaService implements AiTextService {
         if (product.getVariants() == null || product.getVariants().isEmpty()) {
             return 0F;
         }
-        return product.getVariants().stream()
+        BigDecimal minPrice = product.getVariants().stream()
                 .filter(variant -> !Boolean.FALSE.equals(variant.getIsActive()))
                 .map(Variant::getPrice)
                 .filter(price -> price != null)
-                .min(Float::compareTo)
-                .orElse(0F);
+                .min(BigDecimal::compareTo)
+                .orElse(BigDecimal.ZERO);
+        return minPrice.floatValue();
     }
 }

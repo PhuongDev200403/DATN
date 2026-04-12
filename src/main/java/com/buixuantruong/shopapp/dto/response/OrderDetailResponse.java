@@ -2,6 +2,8 @@ package com.buixuantruong.shopapp.dto.response;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 
+import java.math.BigDecimal;
+
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -10,9 +12,9 @@ import lombok.experimental.FieldDefaults;
 public class OrderDetailResponse {
     Long id;
     Long orderId;
-    Float price;
+    BigDecimal price;
     Integer numberOfProducts;
-    Long totalMoney;
+    BigDecimal totalMoney;
     String color;
     VariantResponse variantResponse;
 }

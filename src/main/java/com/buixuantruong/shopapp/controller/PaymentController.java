@@ -30,7 +30,7 @@ public class PaymentController {
         if (paymentDTO.getOrderId() == null) {
             throw new AppException(StatusCode.INVALID_REQUEST);
         }
-        if (paymentDTO.getAmount() == null || paymentDTO.getAmount() <= 0) {
+        if (paymentDTO.getAmount() == null || paymentDTO.getAmount().signum() <= 0) {
             throw new AppException(StatusCode.INVALID_REQUEST);
         }
 

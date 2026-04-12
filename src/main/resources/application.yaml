@@ -1,6 +1,20 @@
 server:
-  port: 8082
+  port: 8081
+  servlet:
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
 spring:
+  ai:
+    openai:
+      api-key: "AIzaSyBURiJ7WG0HiIsEJKRB031pN9Xc-JsuH6w"
+      chat:
+        base-url: https://generativelanguage.googleapis.com
+        completions-path: /v1beta/openai/chat/completions
+        options:
+          model: gemini-2.5-flash
+
   mail:
     host: smtp.gmail.com
     port: 587

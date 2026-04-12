@@ -6,6 +6,8 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
 
+import java.math.BigDecimal;
+
 @Data
 @Builder
 @AllArgsConstructor
@@ -23,7 +25,7 @@ public class PaymentDTO {
 
     @NotNull(message = "Amount is required")
     @Min(value = 0, message = "Amount must be greater than or equal to 0")
-    private Double amount;
+    private BigDecimal amount;
     
     @JsonProperty("transaction_id")
     private String transactionId;

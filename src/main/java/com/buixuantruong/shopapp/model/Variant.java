@@ -3,12 +3,16 @@ package com.buixuantruong.shopapp.model;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Data;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+import java.math.BigDecimal;
 
 @Entity
 @Table(name = "product_variants")
-@Data
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
@@ -17,24 +21,24 @@ public class Variant extends BaseEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "product_id", nullable = false)
     private Product product;
 
     @Column(unique = true, nullable = false)
     private String sku;
 
-    private Float price;
+    @Column(precision = 19, scale = 2)
+    private BigDecimal price;
 
-    private Float discountPrice;
+    @Column(precision = 19, scale = 2)
+    private BigDecimal discountPrice;
 
     private Long stock;
 
     private String color;
 
     private String storage;
-
-    //private String ram;
 
     private String imageUrl;
 
@@ -44,6 +48,6 @@ public class Variant extends BaseEntity {
 
     private Integer weight;
 
-    @OneToOne(mappedBy = "variant", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
+    @OneToOne(mappedBy = "variant", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private Specification specification;
 }

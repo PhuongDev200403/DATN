@@ -11,4 +11,5 @@ public interface FlashSaleService {
     double getFlashSalePrice(Long variantId);
 
     void applyFlashSaleWhenCheckout(Long variantId, int quantity);
+    void releaseFlashSaleReservation(Long variantId, int quantity);
 }

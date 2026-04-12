@@ -5,6 +5,7 @@ import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Date;
 import java.util.List;
@@ -44,11 +45,12 @@ public class Order {
     @Column(name = "order_date")
     Date orderDate;
 
-    @Column(name = "status")
-    String status;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "coupon_id")
+    Coupon coupon;
 
-    @Column(name = "total_money")
-    Long totalMoney;
+    @Column(name = "total_money", precision = 19, scale = 2)
+    BigDecimal totalMoney;
 
     @Column(name = "shipping_method")
     String shippingMethod;
@@ -57,7 +59,7 @@ public class Order {
     String shippingAddress;
 
     @Column(name = "shipping_date")
-    LocalDate shippingDate;
+    Date shippingDate;
 
     @Column(name = "tracking_number")
     String trackingNumber;
@@ -65,17 +67,26 @@ public class Order {
     @Column(name = "payment_method")
     String paymentMethod;
 
-    @Column(name = "payment_status")
-    String paymentStatus;
+    @Enumerated(EnumType.STRING)
+    OrderStatus status;
+
+    @Enumerated(EnumType.STRING)
+    PaymentStatus paymentStatus;
 
     @Column(name = "payment_date")
     String paymentDate;
 
+    @Column(name = "coupon_code")
+    String couponCode;
+
+    @Column(name = "discount_amount", precision = 19, scale = 2)
+    BigDecimal discountAmount;
+
     @Column(name = "active")
     Boolean active;
 
-    @Column(name = "shipping_fee")
-    Long shippingFee;
+    @Column(name = "shipping_fee", precision = 19, scale = 2)
+    BigDecimal shippingFee;
 
     @Column(name = "province_id")
     Integer provinceId;
@@ -89,4 +100,7 @@ public class Order {
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     @JsonManagedReference
     List<OrderDetail> orderDetails;
+
+    @OneToMany(mappedBy = "order", fetch = FetchType.LAZY)
+    List<ProductUnit> productUnits;
 }

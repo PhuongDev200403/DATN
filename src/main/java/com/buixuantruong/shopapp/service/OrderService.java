@@ -12,6 +12,7 @@ import java.util.List;
 @Service
 public interface OrderService {
     OrderResponse createOrder(OrderDTO orderDTO);
+    void finalizeOnlinePayment(Long orderId, boolean paymentSuccessful);
 
     OrderResponse getOrderById(Long id);
 

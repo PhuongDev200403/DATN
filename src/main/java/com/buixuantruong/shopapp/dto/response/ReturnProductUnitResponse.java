@@ -1,19 +1,20 @@
 package com.buixuantruong.shopapp.dto.response;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
-import jakarta.persistence.Column;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
-import lombok.experimental.SuperBuilder;
 
 import java.time.LocalDateTime;
 
 @Data
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@SuperBuilder
 @FieldDefaults(level = AccessLevel.PRIVATE)
-public class BaseResponse {
-    LocalDateTime createAt;
-    LocalDateTime updatedAt;
+public class ReturnProductUnitResponse {
+    String serialNumber;
+    Long orderId;
+    Long variantId;
+    String unitStatus;
+    LocalDateTime returnedAt;
+    String message;
 }

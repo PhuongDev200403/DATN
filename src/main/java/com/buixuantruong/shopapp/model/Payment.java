@@ -3,6 +3,7 @@ package com.buixuantruong.shopapp.model;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
@@ -20,8 +21,8 @@ public class Payment extends BaseEntity {
     @Column(name = "payment_method", nullable = false)
     private String paymentMethod; // VNPAY, COD, CREDIT_CARD
 
-    @Column(name = "amount", nullable = false)
-    private Double amount;
+    @Column(name = "amount", nullable = false, precision = 19, scale = 2)
+    private BigDecimal amount;
 
     @Column(name = "transaction_id")
     private String transactionId;

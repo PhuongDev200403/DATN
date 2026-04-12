@@ -10,4 +10,9 @@ public class AppException extends RuntimeException {
         super(statusCode.getMessage());
         this.statusCode = statusCode;
     }
+
+    public AppException(StatusCode statusCode, String message) {
+        super(message);
+        this.statusCode = statusCode;
+    }
 }

@@ -43,6 +43,11 @@ public enum StatusCode {
     CATEGORY_EXISTED(1033, "Category existed", HttpStatus.BAD_REQUEST),
     PRODUCT_EXISTED(1034, "Product existed", HttpStatus.BAD_REQUEST),
     COUPON_USAGE_LIMIT_EXCEEDED(1035, "Coupon usage limit exceeded", HttpStatus.BAD_REQUEST),
+    PRODUCT_UNIT_NOT_FOUND(1036, "Product unit not found", HttpStatus.NOT_FOUND),
+    PRODUCT_UNIT_NOT_SOLD(1037, "Product unit is not sold", HttpStatus.BAD_REQUEST),
+    ORDER_SERIAL_MISMATCH(1038, "Serial number does not belong to this order", HttpStatus.BAD_REQUEST),
+    RETURN_WINDOW_EXPIRED(1039, "Return is only allowed within 7 days from order date", HttpStatus.BAD_REQUEST),
+    PRODUCT_UNIT_OUT_OF_STOCK(1040, "Not enough physical units in stock", HttpStatus.BAD_REQUEST),
     INTERNAL_SERVER_ERROR(9999, "Internal server error", HttpStatus.INTERNAL_SERVER_ERROR),
     ;
 

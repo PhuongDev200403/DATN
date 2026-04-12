@@ -1,10 +1,7 @@
 package com.buixuantruong.shopapp.dto;
 
 
-import com.buixuantruong.shopapp.model.Role;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 
@@ -31,7 +28,4 @@ public class UserDTO {
     String socialProvider; // GOOGLE hoặc FACEBOOK
     String socialProviderId;
     String avatarUrl;
-    
-    @NotNull(message = "role is required")
-    Role role;
 }

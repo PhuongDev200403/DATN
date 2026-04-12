@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -27,9 +28,9 @@ public class AnalyticsService {
      */
     public AnalyticsOverviewResponse getOverview() {
         // Doanh thu
-        Long totalRevenue = orderRepository.getTotalRevenue();
-        Long revenueThisMonth = orderRepository.getRevenueThisMonth();
-        Long revenueLastMonth = orderRepository.getRevenueLastMonth();
+        Long totalRevenue = toLong(orderRepository.getTotalRevenue());
+        Long revenueThisMonth = toLong(orderRepository.getRevenueThisMonth());
+        Long revenueLastMonth = toLong(orderRepository.getRevenueLastMonth());
         double growthRate = (revenueLastMonth != null && revenueLastMonth > 0)
                 ? ((revenueThisMonth - revenueLastMonth) * 100.0 / revenueLastMonth)
                 : 0.0;
@@ -83,5 +84,9 @@ public class AnalyticsService {
                 .aiInsights(aiAnalysis)
                 .generatedAt(java.time.LocalDateTime.now().toString())
                 .build();
+    }
+
+    private Long toLong(BigDecimal value) {
+        return value == null ? 0L : value.longValue();
     }
 }

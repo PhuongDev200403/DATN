@@ -18,15 +18,15 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     Page<Order> findAll(Pageable pageable);
 
     // Tổng doanh thu
-    @Query("SELECT COALESCE(SUM(o.totalMoney), 0) FROM Order o WHERE o.status = 'DELIVERED'")
+    @Query("SELECT COALESCE(SUM(o.totalMoney), 0) FROM Order o WHERE o.status = 'DELIVERY'")
     BigDecimal getTotalRevenue();
 
     // Doanh thu tháng hiện tại
-    @Query(value = "SELECT COALESCE(SUM(total_money), 0) FROM orders WHERE status = 'DELIVERED' AND MONTH(order_date) = MONTH(CURRENT_DATE()) AND YEAR(order_date) = YEAR(CURRENT_DATE())", nativeQuery = true)
+    @Query(value = "SELECT COALESCE(SUM(total_money), 0) FROM orders WHERE status = 'DELIVERY' AND MONTH(order_date) = MONTH(CURRENT_DATE()) AND YEAR(order_date) = YEAR(CURRENT_DATE())", nativeQuery = true)
     BigDecimal getRevenueThisMonth();
 
     // Doanh thu tháng trước
-    @Query(value = "SELECT COALESCE(SUM(total_money), 0) FROM orders WHERE status = 'DELIVERED' AND MONTH(order_date) = MONTH(DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH)) AND YEAR(order_date) = YEAR(DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH))", nativeQuery = true)
+    @Query(value = "SELECT COALESCE(SUM(total_money), 0) FROM orders WHERE status = 'DELIVERY' AND MONTH(order_date) = MONTH(DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH)) AND YEAR(order_date) = YEAR(DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH))", nativeQuery = true)
     BigDecimal getRevenueLastMonth();
 
     // Đếm đơn hàng tháng này
@@ -45,7 +45,7 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
         JOIN product_variants v ON od.variant_id = v.id
         JOIN products p ON v.product_id = p.id
         JOIN orders o ON od.order_id = o.id
-        WHERE o.status = 'DELIVERED'
+        WHERE o.status = 'DELIVERY'
         GROUP BY v.product_id, p.name
         ORDER BY total_sold DESC
         LIMIT :limit

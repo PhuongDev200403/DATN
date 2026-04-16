@@ -41,7 +41,17 @@ public class ProductServiceImpl implements ProductService {
     ProductMapper productMapper;
 
     @Override
-    @CacheEvict(value = "product_searches", allEntries = true)
+    @Caching(evict = {
+            @CacheEvict(value = "products", allEntries = true),
+            @CacheEvict(value = "product_searches", allEntries = true),
+            @CacheEvict(value = "product_lists", allEntries = true),
+            @CacheEvict(value = "products_by_category", allEntries = true),
+            @CacheEvict(value = "new_products", allEntries = true),
+            @CacheEvict(value = "similar_products", allEntries = true),
+            @CacheEvict(value = "frequently_bought_together", allEntries = true),
+            @CacheEvict(value = "top_selling_products", allEntries = true),
+            @CacheEvict(value = "ai_assistant_search", allEntries = true)
+    })
     @Transactional
     public ProductResponse createProduct(ProductDTO productDTO) {
         if (productRepository.existsByName(productDTO.getName())) {
@@ -65,20 +75,26 @@ public class ProductServiceImpl implements ProductService {
     }
 
     @Override
+    @Cacheable(value = "product_lists", key = "'all:' + #pageRequest.pageNumber + ':' + #pageRequest.pageSize + ':' + #pageRequest.sort.toString()")
     public Page<ProductResponse> getAllProducts(PageRequest pageRequest) {
+        System.out.println("[ProductService] getAllProducts called - loading from DB");
         return productRepository.findAll(pageRequest)
                 .map(productMapper::toResponse);
     }
 
     @Override
+    @Cacheable(value = "products_by_category", key = "T(java.util.Objects).hash(#categoryId, #pageRequest.pageNumber, #pageRequest.pageSize, #pageRequest.sort.toString())")
     public Page<ProductResponse> getProductsByCategory(Long categoryId, PageRequest pageRequest) {
+        System.out.println("[ProductService] getProductsByCategory called - loading from DB, categoryId=" + categoryId);
         return productRepository.findByCategoryId(categoryId, pageRequest)
                 .map(productMapper::toResponse);
     }
 
-    //Phương thức hiển thị carousel sản phẩm mới
+    //Phuong thuc hien thi carousel san pham moi
     @Override
+    @Cacheable(value = "new_products", key = "T(java.util.Objects).hash(#months, #pageRequest.pageNumber, #pageRequest.pageSize, #pageRequest.sort.toString())")
     public Page<ProductResponse> getNewProducts(int months, PageRequest pageRequest) {
+        System.out.println("[ProductService] getNewProducts called - loading from DB, months=" + months);
         int effectiveMonths = months <= 0 ? 6 : months;
         LocalDateTime fromDate = LocalDateTime.now().minusMonths(effectiveMonths);
         return productRepository.findNewProducts(fromDate, pageRequest)
@@ -88,6 +104,7 @@ public class ProductServiceImpl implements ProductService {
     @Override
     @Cacheable(value = "product_searches", key = "T(java.util.Objects).hash(#categoryId, #keyword, #minPrice, #maxPrice, #pageRequest.pageNumber, #pageRequest.pageSize)")
     public Page<ProductResponse> searchProducts(Long categoryId, String keyword, Float minPrice, Float maxPrice, PageRequest pageRequest) {
+        System.out.println("[ProductService] searchProducts called - loading from DB, keyword=" + keyword);
         return productRepository.searchProducts(categoryId, keyword, minPrice, maxPrice, pageRequest)
                 .map(productMapper::toResponse);
     }
@@ -96,6 +113,13 @@ public class ProductServiceImpl implements ProductService {
     @Transactional
     @Caching(evict = {
             @CacheEvict(value = "products", key = "#id"),
+            @CacheEvict(value = "product_lists", allEntries = true),
+            @CacheEvict(value = "products_by_category", allEntries = true),
+            @CacheEvict(value = "new_products", allEntries = true),
+            @CacheEvict(value = "similar_products", allEntries = true),
+            @CacheEvict(value = "frequently_bought_together", allEntries = true),
+            @CacheEvict(value = "top_selling_products", allEntries = true),
+            @CacheEvict(value = "ai_assistant_search", allEntries = true),
             @CacheEvict(value = "product_searches", allEntries = true)
     })
     public ProductResponse updateProduct(long id, ProductDTO productDTO) {
@@ -120,6 +144,13 @@ public class ProductServiceImpl implements ProductService {
     @Transactional
     @Caching(evict = {
             @CacheEvict(value = "products", key = "#id"),
+            @CacheEvict(value = "product_lists", allEntries = true),
+            @CacheEvict(value = "products_by_category", allEntries = true),
+            @CacheEvict(value = "new_products", allEntries = true),
+            @CacheEvict(value = "similar_products", allEntries = true),
+            @CacheEvict(value = "frequently_bought_together", allEntries = true),
+            @CacheEvict(value = "top_selling_products", allEntries = true),
+            @CacheEvict(value = "ai_assistant_search", allEntries = true),
             @CacheEvict(value = "product_searches", allEntries = true)
     })
     public MessageResponse deleteProduct(long id) {
@@ -141,7 +172,9 @@ public class ProductServiceImpl implements ProductService {
     }
 
     @Override
+    @Cacheable(value = "similar_products", key = "#productId")
     public List<ProductResponse> getSimilarProducts(Long productId) {
+        System.out.println("[ProductService] getSimilarProducts called - loading from DB, productId=" + productId);
         Product product = productRepository.findById(productId)
                 .orElseThrow(() -> new AppException(StatusCode.PRODUCT_NOT_FOUND));
 
@@ -164,7 +197,9 @@ public class ProductServiceImpl implements ProductService {
     }
 
     @Override
+    @Cacheable(value = "frequently_bought_together", key = "#productId")
     public List<ProductResponse> getFrequentlyBoughtTogetherProducts(Long productId) {
+        System.out.println("[ProductService] getFrequentlyBoughtTogetherProducts called - loading from DB, productId=" + productId);
         productRepository.findById(productId)
                 .orElseThrow(() -> new AppException(StatusCode.PRODUCT_NOT_FOUND));
 
@@ -177,7 +212,9 @@ public class ProductServiceImpl implements ProductService {
     }
 
     @Override
+    @Cacheable(value = "top_selling_products")
     public List<ProductResponse> getTopSellingProducts() {
+        System.out.println("[ProductService] getTopSellingProducts called - loading from DB");
         List<Long> orderedIds = orderDetailRepository.findTopSellingProductIds().stream()
                 .map(row -> ((Number) row[0]).longValue())
                 .limit(10)
@@ -187,7 +224,9 @@ public class ProductServiceImpl implements ProductService {
     }
 
     @Override
+    @Cacheable(value = "ai_assistant_search", key = "#query")
     public String getAiAssistantResponse(String query) throws Exception {
+        System.out.println("[ProductService] getAiAssistantResponse called - loading from AI, query=" + query);
         return aiTextService.getRecommendations(query, productRepository.findAll());
     }
 

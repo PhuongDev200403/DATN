@@ -4,19 +4,18 @@ import com.buixuantruong.shopapp.dto.ProductDTO;
 import com.buixuantruong.shopapp.dto.response.*;
 import com.buixuantruong.shopapp.exception.StatusCode;
 import com.buixuantruong.shopapp.service.ProductService;
-import com.buixuantruong.shopapp.service.impl.ChatServiceImpl;
+import com.buixuantruong.shopapp.service.ProductImageSearchService;
 import jakarta.validation.Valid;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
-import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.Arrays;
 import java.util.List;
@@ -27,7 +26,7 @@ import java.util.List;
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class ProductController {
     ProductService productService;
-    ChatServiceImpl chatService;
+    ProductImageSearchService productImageSearchService;
 
 
 
@@ -72,6 +71,27 @@ public class ProductController {
         Sort sortObj = direction.equalsIgnoreCase("desc") ? Sort.by(sort).descending() : Sort.by(sort).ascending();
         PageRequest pageRequest = PageRequest.of(page, limit, sortObj);
         Page<ProductResponse> products = productService.searchProducts(categoryId, keyword, minPrice, maxPrice, pageRequest);
+        return ApiResponse.<ProductListResponse>builder()
+                .code(StatusCode.SUCCESS.getCode())
+                .message(StatusCode.SUCCESS.getMessage())
+                .result(new ProductListResponse(products.getContent(), products.getTotalPages()))
+                .build();
+    }
+
+    @PostMapping(value = "/search-by-image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ApiResponse<ProductListResponse> searchByImage(
+            @RequestPart("file") MultipartFile file,
+            @RequestParam(value = "page", defaultValue = "0") int page,
+            @RequestParam(value = "limit", defaultValue = "10") int limit,
+            @RequestParam(value = "category_id", required = false) Long categoryId,
+            @RequestParam(value = "min_price", required = false) Float minPrice,
+            @RequestParam(value = "max_price", required = false) Float maxPrice,
+            @RequestParam(value = "sort", defaultValue = "id") String sort,
+            @RequestParam(value = "direction", defaultValue = "asc") String direction
+    ) {
+        Sort sortObj = direction.equalsIgnoreCase("desc") ? Sort.by(sort).descending() : Sort.by(sort).ascending();
+        PageRequest pageRequest = PageRequest.of(page, limit, sortObj);
+        Page<ProductResponse> products = productImageSearchService.searchByImage(file, categoryId, minPrice, maxPrice, pageRequest);
         return ApiResponse.<ProductListResponse>builder()
                 .code(StatusCode.SUCCESS.getCode())
                 .message(StatusCode.SUCCESS.getMessage())

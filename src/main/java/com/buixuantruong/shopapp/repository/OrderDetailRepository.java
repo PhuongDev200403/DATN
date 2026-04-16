@@ -17,6 +17,7 @@ public interface OrderDetailRepository extends JpaRepository<OrderDetail, Long> 
             SELECT od2.variant.product.id, COUNT(od2.id)
             FROM OrderDetail od1, OrderDetail od2
             WHERE od1.order.id = od2.order.id
+              AND od1.order.status = com.buixuantruong.shopapp.model.OrderStatus.DELIVERY
               AND od1.variant.product.id = :productId
               AND od2.variant.product.id <> :productId
               AND EXISTS (
@@ -37,6 +38,7 @@ public interface OrderDetailRepository extends JpaRepository<OrderDetail, Long> 
                 WHERE v.product = od.variant.product
                   AND v.isActive = true
             )
+              AND od.order.status = com.buixuantruong.shopapp.model.OrderStatus.DELIVERY
             GROUP BY od.variant.product.id
             ORDER BY SUM(od.numberOfProducts) DESC
             """)

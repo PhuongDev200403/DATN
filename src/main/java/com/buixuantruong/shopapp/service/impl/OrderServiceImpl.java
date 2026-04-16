@@ -12,6 +12,8 @@ import com.buixuantruong.shopapp.model.Coupon;
 import com.buixuantruong.shopapp.model.CouponType;
 import com.buixuantruong.shopapp.model.Order;
 import com.buixuantruong.shopapp.model.OrderDetail;
+import com.buixuantruong.shopapp.model.OrderStatus;
+import com.buixuantruong.shopapp.model.PaymentStatus;
 import com.buixuantruong.shopapp.model.Specification;
 import com.buixuantruong.shopapp.model.User;
 import com.buixuantruong.shopapp.model.Variant;
@@ -39,10 +41,10 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
-import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -120,8 +122,8 @@ public class OrderServiceImpl implements OrderService {
 
         if (paymentSuccessful) {
             productUnitService.confirmUnitsSold(order.getId());
-            order.setStatus(OrderStatusField.PAID);
-            order.setPaymentStatus(OrderStatusField.PAID);
+            order.setStatus(OrderStatus.PENDING);
+            order.setPaymentStatus(PaymentStatus.SUCCESS);
             order.setPaymentDate(LocalDateTime.now().toString());
             orderRepository.save(order);
             return;
@@ -130,8 +132,8 @@ public class OrderServiceImpl implements OrderService {
         productUnitService.releaseUnits(order.getId());
         releaseReservedInventory(order);
         releaseCouponUsage(order.getCouponCode());
-        order.setStatus(OrderStatusField.FAILED);
-        order.setPaymentStatus(OrderStatusField.FAILED);
+        order.setStatus(OrderStatus.CANCLED);
+        order.setPaymentStatus(PaymentStatus.FAILED);
         orderRepository.save(order);
     }
 
@@ -164,13 +166,13 @@ public class OrderServiceImpl implements OrderService {
         order.setWardCode(orderDTO.getWardCode());
 
         if (orderDTO.getStatus() != null && !orderDTO.getStatus().isBlank()) {
-            order.setStatus(orderDTO.getStatus());
+            order.setStatus(parseOrderStatus(orderDTO.getStatus()));
         }
         if (orderDTO.getShippingDate() != null) {
             if (orderDTO.getShippingDate().isBefore(LocalDate.now())) {
                 throw new AppException(StatusCode.SHIPPING_DATE_INVALID);
             }
-            order.setShippingDate(orderDTO.getShippingDate());
+            order.setShippingDate(toDate(orderDTO.getShippingDate()));
         }
 
         return orderMapper.toResponse(orderRepository.save(order));
@@ -179,14 +181,23 @@ public class OrderServiceImpl implements OrderService {
     @Override
     @Transactional
     public MessageResponse deleteOrder(Long id) {
-        Optional<Order> optionalOrder = orderRepository.findById(id);
-        if (optionalOrder.isPresent()) {
-            Order order = optionalOrder.get();
-            order.setActive(false);
-            orderRepository.save(order);
-            return MessageResponse.builder().message("Order deleted successfully").build();
+        Order order = orderRepository.findById(id)
+                .orElseThrow(() -> new AppException(StatusCode.ORDER_NOT_FOUND));
+
+        if (!isDeletableOrder(order)) {
+            throw new AppException(StatusCode.INVALID_REQUEST, "Only pending orders can be deleted");
         }
-        throw new AppException(StatusCode.ORDER_NOT_FOUND);
+
+        productUnitService.releaseUnits(order.getId());
+        releaseReservedInventory(order);
+        releaseCouponUsage(order.getCouponCode());
+
+        order.setStatus(OrderStatus.CANCLED);
+        order.setPaymentStatus(PaymentStatus.CANCELLED);
+        order.setActive(false);
+        orderRepository.save(order);
+
+        return MessageResponse.builder().message("Order deleted successfully").build();
     }
 
     @Override
@@ -206,8 +217,8 @@ public class OrderServiceImpl implements OrderService {
         Order order = orderMapper.toOrder(orderDTO);
         order.setUser(user);
         order.setOrderDate(new Date());
-        order.setStatus(OrderStatusField.PENDING);
-        order.setPaymentStatus(OrderStatusField.PENDING);
+        order.setStatus(OrderStatus.PENDING);
+        order.setPaymentStatus(PaymentStatus.PENDING);
         order.setDiscountAmount(ZERO);
         order.setActive(true);
         order.setPaymentMethod(normalizePaymentMethod(orderDTO.getPaymentMethod()));
@@ -216,7 +227,7 @@ public class OrderServiceImpl implements OrderService {
         if (shippingDate.isBefore(LocalDate.now())) {
             throw new AppException(StatusCode.SHIPPING_DATE_INVALID);
         }
-        order.setShippingDate(shippingDate);
+        order.setShippingDate(toDate(shippingDate));
         return order;
     }
 
@@ -357,15 +368,15 @@ public class OrderServiceImpl implements OrderService {
     private void updateOrderStatusAfterCheckout(Order order, OrderDTO orderDTO) {
         String paymentMethod = normalizePaymentMethod(order.getPaymentMethod());
         if ("COD".equals(paymentMethod)) {
-            order.setStatus(OrderStatusField.CONFIRMED);
-            order.setPaymentStatus(OrderStatusField.CONFIRMED);
+            order.setStatus(OrderStatus.PENDING);
+            order.setPaymentStatus(PaymentStatus.SUCCESS);
             order.setPaymentDate(LocalDateTime.now().toString());
             return;
         }
 
         if (Boolean.TRUE.equals(orderDTO.getPaymentSuccess())) {
-            order.setStatus(OrderStatusField.PAID);
-            order.setPaymentStatus(OrderStatusField.PAID);
+            order.setStatus(OrderStatus.PENDING);
+            order.setPaymentStatus(PaymentStatus.SUCCESS);
             order.setPaymentDate(LocalDateTime.now().toString());
         }
     }
@@ -440,6 +451,26 @@ public class OrderServiceImpl implements OrderService {
 
     private String normalizePaymentMethod(String paymentMethod) {
         return paymentMethod == null ? "" : paymentMethod.trim().toUpperCase();
+    }
+
+    private boolean isDeletableOrder(Order order) {
+        return order.getStatus() == OrderStatus.PENDING
+                && (order.getPaymentStatus() == null || order.getPaymentStatus() == PaymentStatus.PENDING);
+    }
+
+    private OrderStatus parseOrderStatus(String status) {
+        String normalized = status.trim().toUpperCase();
+        return switch (normalized) {
+            case "CONFIRMED", "PAID", "PENDING", "PROCESSING" -> OrderStatus.PENDING;
+            case "SHIPPED" -> OrderStatus.SHIPPED;
+            case "DELIVERED", "DELIVERY" -> OrderStatus.DELIVERY;
+            case "CANCELLED", "CANCELED", "CANCLED" -> OrderStatus.CANCLED;
+            default -> throw new AppException(StatusCode.INVALID_DATA, "Invalid order status: " + status);
+        };
+    }
+
+    private Date toDate(LocalDate localDate) {
+        return Date.from(localDate.atStartOfDay(ZoneId.systemDefault()).toInstant());
     }
 
     private record CheckoutItem(Variant variant, int quantity, BigDecimal unitPrice) {

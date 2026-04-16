@@ -23,6 +23,7 @@ public class CartController {
 
     CartService cartService;
 
+    //Phương thức get cart
     @GetMapping
     public ApiResponse<CartResponse> getCart() {
         return ApiResponse.<CartResponse>builder()
@@ -32,6 +33,7 @@ public class CartController {
                 .build();
     }
 
+    //Phương thức add to cart
     @PostMapping("/add")
     public ApiResponse<CartResponse> addToCart(@RequestParam Long variantId, @RequestParam Integer quantity) {
         return ApiResponse.<CartResponse>builder()
@@ -41,7 +43,8 @@ public class CartController {
                 .build();
     }
 
-    @PutMapping("/update")
+    //Phương thức cập nhật số lượng trong giỏ hàng
+    @PutMapping("/update/{variantId}")
     public ApiResponse<CartResponse> updateQuantity(@RequestParam Long variantId, @RequestParam Integer quantity) {
         return ApiResponse.<CartResponse>builder()
                 .code(StatusCode.SUCCESS.getCode())
@@ -50,6 +53,7 @@ public class CartController {
                 .build();
     }
 
+    //Phương thức xóa sản phẩm trong giỏ hàng
     @DeleteMapping("/remove/{variantId}")
     public ApiResponse<MessageResponse> removeFromCart(@PathVariable Long variantId) {
         cartService.removeFromCart(getCurrentUserId(), variantId);
@@ -60,6 +64,7 @@ public class CartController {
                 .build();
     }
 
+    //Lấy giỏ hàng của bản thân
     @PostMapping("/sync")
     public ApiResponse<MessageResponse> syncCart(@RequestBody List<Map<String, Object>> items) {
         cartService.syncCart(getCurrentUserId(), items);

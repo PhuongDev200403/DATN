@@ -25,9 +25,4 @@ public class ChatController {
         return chatService.chatWithImage(file, message);
     }
 
-    @PostMapping(value = "/search-by-image")
-    ChatResponse searchByImage(@RequestParam("file") MultipartFile file){
-        return chatService.searchByImage(file);
-    }
-
 }

@@ -22,6 +22,7 @@ public class CategoryController {
 
     CategoryService categoryService;
 
+    //Tạo danh mục sản phẩm
     @PostMapping("")
     public ApiResponse<CategoryResponse> createCategory(@Valid @RequestBody CategoryDTO categoryDTO) {
         return ApiResponse.<CategoryResponse>builder()
@@ -31,6 +32,7 @@ public class CategoryController {
                 .build();
     }
 
+    //Xem tất cả danh mục sản phẩm
     @GetMapping("")
     public ApiResponse<List<CategoryResponse>> getAllCategories(@RequestParam("page") int page, @RequestParam("limit") int limit) {
         return ApiResponse.<List<CategoryResponse>>builder()
@@ -40,6 +42,7 @@ public class CategoryController {
                 .build();
     }
 
+    //Cập nhật danh mục
     @PutMapping("/{id}")
     public ApiResponse<CategoryResponse> updateCategory(@PathVariable Long id, @RequestBody @Valid CategoryDTO categoryDTO) {
         return ApiResponse.<CategoryResponse>builder()
@@ -49,6 +52,7 @@ public class CategoryController {
                 .build();
     }
 
+    //Xóa danh mục
     @DeleteMapping("/categories/{id}")
     public ApiResponse<MessageResponse> deleteCategory(@PathVariable Long id) {
         return ApiResponse.<MessageResponse>builder()
